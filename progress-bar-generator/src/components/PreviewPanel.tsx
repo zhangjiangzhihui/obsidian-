@@ -20,14 +20,15 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
   const canvasRef = useRef<ProgressBarCanvasRef>(null);
   const animationRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
+  const pausedProgressRef = useRef<number>(0);
 
   const animate = useCallback((timestamp: number) => {
     if (!startTimeRef.current) {
-      startTimeRef.current = timestamp;
+      startTimeRef.current = timestamp - pausedProgressRef.current * config.totalDuration * 1000;
     }
 
     const elapsed = timestamp - startTimeRef.current;
-    const duration = config.duration * 1000;
+    const duration = config.totalDuration * 1000;
     const newProgress = Math.min(elapsed / duration, 1);
 
     setProgress(newProgress);
@@ -37,29 +38,36 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
     } else {
       setIsPlaying(false);
       startTimeRef.current = 0;
+      pausedProgressRef.current = 0;
     }
-  }, [config.duration]);
+  }, [config.totalDuration]);
 
   const play = useCallback(() => {
     if (progress >= 1) {
       setProgress(0);
-      startTimeRef.current = 0;
+      pausedProgressRef.current = 0;
+    } else {
+      pausedProgressRef.current = progress;
     }
+    startTimeRef.current = 0;
     setIsPlaying(true);
     animationRef.current = requestAnimationFrame(animate);
   }, [animate, progress]);
 
   const pause = useCallback(() => {
     setIsPlaying(false);
+    pausedProgressRef.current = progress;
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     }
-  }, []);
+    startTimeRef.current = 0;
+  }, [progress]);
 
   const reset = useCallback(() => {
     pause();
     setProgress(0);
+    pausedProgressRef.current = 0;
     startTimeRef.current = 0;
   }, [pause]);
 
@@ -71,6 +79,18 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
     };
   }, []);
 
+  // Get current chapter name
+  const getCurrentChapter = () => {
+    let accumulated = 0;
+    for (const chapter of config.chapters) {
+      accumulated += chapter.duration / 100;
+      if (progress <= accumulated) {
+        return chapter.name;
+      }
+    }
+    return config.chapters[config.chapters.length - 1]?.name || '';
+  };
+
   // Export as PNG sequence
   const exportPNGSequence = async () => {
     setIsExporting(true);
@@ -78,7 +98,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
     setExportProgress(0);
 
     const zip = new JSZip();
-    const totalFrames = config.duration * config.fps;
+    const totalFrames = config.totalDuration * config.fps;
 
     try {
       for (let frame = 0; frame <= totalFrames; frame++) {
@@ -95,14 +115,13 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
 
         setExportProgress((frame / totalFrames) * 100);
         
-        // Yield to UI
         if (frame % 10 === 0) {
           await new Promise(resolve => setTimeout(resolve, 0));
         }
       }
 
       const content = await zip.generateAsync({ type: 'blob' });
-      saveAs(content, `progress-bar-${config.style}-${Date.now()}.zip`);
+      saveAs(content, `chapter-progress-bar-${Date.now()}.zip`);
     } catch (error) {
       console.error('Export failed:', error);
       alert('导出失败，请重试');
@@ -110,7 +129,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
       setIsExporting(false);
       setExportType(null);
       setExportProgress(0);
-      // Restore current progress
       canvasRef.current?.renderFrame(progress);
     }
   };
@@ -122,18 +140,17 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
     setExportProgress(0);
 
     try {
-      // Dynamic import of gif.js worker
       const GIF = (await import('gif.js')).default;
 
       const gif = new GIF({
         workers: 2,
         quality: 10,
         width: config.width,
-        height: config.height,
-        workerScript: '/gif.worker.js',
+        height: config.showChapterNames && config.chapterNamePosition !== 'inside' ? config.height + 30 : config.height,
+        workerScript: '/obsidian-/gif.worker.js',
       });
 
-      const totalFrames = Math.min(config.duration * config.fps, 300); // Limit frames for GIF
+      const totalFrames = Math.min(config.totalDuration * config.fps, 300);
       const frameDelay = 1000 / config.fps;
 
       for (let frame = 0; frame <= totalFrames; frame++) {
@@ -157,7 +174,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
       });
 
       gif.on('finished', (blob: Blob) => {
-        saveAs(blob, `progress-bar-${config.style}-${Date.now()}.gif`);
+        saveAs(blob, `chapter-progress-bar-${Date.now()}.gif`);
         setIsExporting(false);
         setExportType(null);
         setExportProgress(0);
@@ -167,8 +184,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
       gif.render();
     } catch (error) {
       console.error('GIF export failed:', error);
-      // Fallback to PNG sequence
-      alert('GIF 导出暂不可用，将导出为 PNG 序列');
+      alert('GIF 导出失败，将导出为 PNG 序列');
       setIsExporting(false);
       setExportType(null);
       exportPNGSequence();
@@ -181,16 +197,28 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
     if (canvas) {
       canvas.toBlob((blob) => {
         if (blob) {
-          saveAs(blob, `progress-bar-frame-${Math.round(progress * 100)}%-${Date.now()}.png`);
+          saveAs(blob, `chapter-progress-${Math.round(progress * 100)}%-${Date.now()}.png`);
         }
       });
     }
   };
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Preview Area */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-[#0a0a0a] rounded-2xl mb-4 min-h-[300px]">
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#0a0a0a] rounded-2xl mb-4 min-h-[300px]">
+        {/* Current chapter indicator */}
+        <div className="mb-6 text-center">
+          <span className="text-xs text-gray-500 uppercase tracking-wider">当前章节</span>
+          <h3 className="text-xl font-semibold text-white mt-1">{getCurrentChapter()}</h3>
+        </div>
+
         <div 
           className="relative"
           style={{
@@ -198,7 +226,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
             maxHeight: '100%',
           }}
         >
-          {/* Checkerboard background to show transparency */}
+          {/* Checkerboard background */}
           <div 
             className="absolute inset-0 rounded-lg opacity-20"
             style={{
@@ -218,13 +246,45 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
             progress={progress}
           />
         </div>
+
+        {/* Chapter visualization */}
+        <div className="mt-6 flex items-center gap-1 flex-wrap justify-center">
+          {config.chapters.map((chapter, index) => {
+            let accumulated = 0;
+            for (let i = 0; i <= index; i++) {
+              accumulated += config.chapters[i].duration / 100;
+            }
+            const isActive = progress >= (accumulated - chapter.duration / 100) && progress < accumulated;
+            const isPast = progress >= accumulated;
+            
+            return (
+              <div
+                key={chapter.id}
+                className={`px-3 py-1 rounded-full text-xs transition-all ${
+                  isActive 
+                    ? 'scale-110 font-medium' 
+                    : isPast 
+                    ? 'opacity-60' 
+                    : 'opacity-40'
+                }`}
+                style={{
+                  backgroundColor: isActive ? chapter.color : 'transparent',
+                  border: `2px solid ${chapter.color}`,
+                  color: isActive ? '#fff' : chapter.color,
+                }}
+              >
+                {chapter.name}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Progress Scrubber */}
       <div className="mb-4">
         <div className="flex items-center justify-between text-sm text-gray-400 mb-2">
           <span>{Math.round(progress * 100)}%</span>
-          <span>{(progress * config.duration).toFixed(1)}s / {config.duration}s</span>
+          <span>{formatTime(progress * config.totalDuration)} / {formatTime(config.totalDuration)}</span>
         </div>
         <input
           type="range"
@@ -235,6 +295,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
           onChange={(e) => {
             pause();
             setProgress(Number(e.target.value));
+            pausedProgressRef.current = Number(e.target.value);
           }}
           className="w-full"
         />
@@ -316,7 +377,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
         </div>
 
         <p className="text-xs text-gray-500 text-center mt-2">
-          PNG 序列适合视频编辑软件，GIF 适合快速预览分享
+          PNG 序列适合 Premiere/After Effects/达芬奇，GIF 适合快速预览
         </p>
       </div>
     </div>
