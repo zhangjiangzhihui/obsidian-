@@ -103,26 +103,29 @@ export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCan
       // Clear canvas
       ctx.clearRect(0, 0, config.width, canvasHeight);
 
-      // Render based on style
+      // Render progress bar style
+      // Pass mascot info so it can replace the progress indicator
+      const hasMascotOnBar = config.mascot.type !== 'none' && config.mascot.position === 'on-bar';
+      
       switch (config.style) {
         case 'modern':
-          renderModernStyle(ctx, config, easedProgress, barY);
+          renderModernStyle(ctx, config, easedProgress, barY, hasMascotOnBar);
           break;
         case 'minimal':
-          renderMinimalStyle(ctx, config, easedProgress, barY);
+          renderMinimalStyle(ctx, config, easedProgress, barY, hasMascotOnBar);
           break;
         case 'neon':
-          renderNeonStyle(ctx, config, easedProgress, barY);
+          renderNeonStyle(ctx, config, easedProgress, barY, hasMascotOnBar);
           break;
         case 'glass':
-          renderGlassStyle(ctx, config, easedProgress, barY);
+          renderGlassStyle(ctx, config, easedProgress, barY, hasMascotOnBar);
           break;
         case 'gradient':
-          renderGradientStyle(ctx, config, easedProgress, barY);
+          renderGradientStyle(ctx, config, easedProgress, barY, hasMascotOnBar);
           break;
       }
       
-      // Render mascot
+      // Render mascot last (on top of progress bar, below chapter names which are drawn by style)
       if (config.mascot.type !== 'none') {
         renderMascot(ctx, config, easedProgress, barY, currentProgress);
       }
@@ -217,7 +220,8 @@ function renderModernStyle(
   ctx: CanvasRenderingContext2D,
   config: ProgressBarConfig,
   progress: number,
-  barY: number
+  barY: number,
+  hideDot: boolean = false
 ) {
   const { width, height, chapters, borderRadius, backgroundColor, showChapterDividers, showChapterNames, chapterNamePosition, totalDuration } = config;
   
@@ -341,25 +345,27 @@ function renderModernStyle(
     ctx.fillText(timeText, width - 12, barY + height / 2);
   }
 
-  // Draw progress indicator
-  const progressX = progress * width;
-  if (progressX > 0 && progressX < width) {
-    if (config.glowEffect) {
+  // Draw progress indicator (skip if mascot replaces it)
+  if (!hideDot) {
+    const progressX = progress * width;
+    if (progressX > 0 && progressX < width) {
+      if (config.glowEffect) {
+        ctx.beginPath();
+        ctx.arc(progressX, barY + height / 2, 10, 0, Math.PI * 2);
+        ctx.fillStyle = hexToRgba(currentChapter?.chapter.color || config.progressColor, 0.3);
+        ctx.fill();
+      }
+      
       ctx.beginPath();
-      ctx.arc(progressX, barY + height / 2, 10, 0, Math.PI * 2);
-      ctx.fillStyle = hexToRgba(currentChapter?.chapter.color || config.progressColor, 0.3);
+      ctx.arc(progressX, barY + height / 2, 7, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.arc(progressX, barY + height / 2, 4, 0, Math.PI * 2);
+      ctx.fillStyle = currentChapter?.chapter.color || config.progressColor;
       ctx.fill();
     }
-    
-    ctx.beginPath();
-    ctx.arc(progressX, barY + height / 2, 7, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
-    
-    ctx.beginPath();
-    ctx.arc(progressX, barY + height / 2, 4, 0, Math.PI * 2);
-    ctx.fillStyle = currentChapter?.chapter.color || config.progressColor;
-    ctx.fill();
   }
 }
 
@@ -368,7 +374,8 @@ function renderMinimalStyle(
   ctx: CanvasRenderingContext2D,
   config: ProgressBarConfig,
   progress: number,
-  barY: number
+  barY: number,
+  _hideDot: boolean = false
 ) {
   const { width, height, chapters, borderRadius, backgroundColor, showChapterNames, chapterNamePosition, totalDuration } = config;
   
@@ -453,7 +460,8 @@ function renderNeonStyle(
   ctx: CanvasRenderingContext2D,
   config: ProgressBarConfig,
   progress: number,
-  barY: number
+  barY: number,
+  _hideDot: boolean = false
 ) {
   const { width, height, chapters, borderRadius, showChapterNames, chapterNamePosition, totalDuration } = config;
   
@@ -555,7 +563,8 @@ function renderGlassStyle(
   ctx: CanvasRenderingContext2D,
   config: ProgressBarConfig,
   progress: number,
-  barY: number
+  barY: number,
+  _hideDot: boolean = false
 ) {
   const { width, height, chapters, borderRadius, showChapterNames, chapterNamePosition, totalDuration } = config;
   
@@ -655,7 +664,8 @@ function renderGradientStyle(
   ctx: CanvasRenderingContext2D,
   config: ProgressBarConfig,
   progress: number,
-  barY: number
+  barY: number,
+  hideDot: boolean = false
 ) {
   const { width, height, chapters, borderRadius, backgroundColor, showChapterNames, chapterNamePosition, totalDuration } = config;
   
@@ -744,7 +754,8 @@ function renderGradientStyle(
 
   ctx.restore();
 
-  if (progressX > 0 && progressX < width) {
+  // Draw progress indicator (skip if mascot replaces it)
+  if (!hideDot && progressX > 0 && progressX < width) {
     const headColor = currentChapter?.chapter.color || config.progressColor;
     
     if (config.glowEffect) {
