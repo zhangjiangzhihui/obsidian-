@@ -3,7 +3,7 @@ export type ProgressBarStyle = 'modern' | 'minimal' | 'neon' | 'glass' | 'gradie
 export interface Chapter {
   id: string;
   name: string;
-  duration: number; // percentage of total (0-100)
+  startTime: number; // in seconds
   color?: string;
 }
 
@@ -43,19 +43,20 @@ export interface ProgressBarConfig {
   fontWeight: 'normal' | 'medium' | 'bold';
 }
 
+// Default chapters with timestamps
 export const DEFAULT_CHAPTERS: Chapter[] = [
-  { id: '1', name: '开场', duration: 10, color: '#6366f1' },
-  { id: '2', name: '第一部分', duration: 25, color: '#8b5cf6' },
-  { id: '3', name: '核心内容', duration: 40, color: '#a855f7' },
-  { id: '4', name: '总结', duration: 15, color: '#d946ef' },
-  { id: '5', name: '结尾', duration: 10, color: '#ec4899' },
+  { id: '1', name: '开场', startTime: 0, color: '#6366f1' },
+  { id: '2', name: '第一部分', startTime: 15, color: '#8b5cf6' },
+  { id: '3', name: '核心内容', startTime: 45, color: '#a855f7' },
+  { id: '4', name: '总结', startTime: 100, color: '#d946ef' },
+  { id: '5', name: '结尾', startTime: 130, color: '#ec4899' },
 ];
 
 export const DEFAULT_CONFIG: ProgressBarConfig = {
   style: 'modern',
   width: 1000,
   height: 60,
-  totalDuration: 60,
+  totalDuration: 150, // 2:30
   fps: 30,
   
   backgroundColor: '#1a1a2e',
@@ -111,3 +112,42 @@ export const PRESET_COLOR_SCHEMES = [
     colors: ['#059669', '#10b981', '#34d399', '#6ee7b7', '#a7f3d0'],
   },
 ];
+
+// Helper: Convert seconds to time string (mm:ss)
+export function formatTimeString(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Helper: Parse time string to seconds
+export function parseTimeString(timeStr: string): number {
+  const parts = timeStr.split(':');
+  if (parts.length === 1) {
+    return parseInt(parts[0], 10) || 0;
+  } else if (parts.length === 2) {
+    const mins = parseInt(parts[0], 10) || 0;
+    const secs = parseInt(parts[1], 10) || 0;
+    return mins * 60 + secs;
+  } else if (parts.length === 3) {
+    const hours = parseInt(parts[0], 10) || 0;
+    const mins = parseInt(parts[1], 10) || 0;
+    const secs = parseInt(parts[2], 10) || 0;
+    return hours * 3600 + mins * 60 + secs;
+  }
+  return 0;
+}
+
+// Helper: Get chapter duration based on next chapter's start time
+export function getChapterDuration(chapters: Chapter[], index: number, totalDuration: number): number {
+  if (index >= chapters.length - 1) {
+    return totalDuration - chapters[index].startTime;
+  }
+  return chapters[index + 1].startTime - chapters[index].startTime;
+}
+
+// Helper: Get chapter duration as percentage
+export function getChapterPercentage(chapters: Chapter[], index: number, totalDuration: number): number {
+  const duration = getChapterDuration(chapters, index, totalDuration);
+  return (duration / totalDuration) * 100;
+}

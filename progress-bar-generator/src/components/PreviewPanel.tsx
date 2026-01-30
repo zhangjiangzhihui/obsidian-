@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { ProgressBarConfig } from '../types';
+import { formatTimeString } from '../types';
 import ProgressBarCanvas from './ProgressBarCanvas';
 import type { ProgressBarCanvasRef } from './ProgressBarCanvas';
 import { Play, Pause, RotateCcw, Loader2, Image, Film, FileArchive } from 'lucide-react';
@@ -79,17 +80,18 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
     };
   }, []);
 
-  // Get current chapter name
+  // Get current chapter
   const getCurrentChapter = () => {
-    let accumulated = 0;
-    for (const chapter of config.chapters) {
-      accumulated += chapter.duration / 100;
-      if (progress <= accumulated) {
-        return chapter.name;
+    const currentTime = progress * config.totalDuration;
+    for (let i = config.chapters.length - 1; i >= 0; i--) {
+      if (currentTime >= config.chapters[i].startTime) {
+        return config.chapters[i];
       }
     }
-    return config.chapters[config.chapters.length - 1]?.name || '';
+    return config.chapters[0];
   };
+
+  const currentChapter = getCurrentChapter();
 
   // Export as PNG sequence
   const exportPNGSequence = async () => {
@@ -146,7 +148,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
         workers: 2,
         quality: 10,
         width: config.width,
-        height: config.showChapterNames && config.chapterNamePosition !== 'inside' ? config.height + 30 : config.height,
+        height: config.showChapterNames && config.chapterNamePosition !== 'inside' ? config.height + 35 : config.height,
         workerScript: '/obsidian-/gif.worker.js',
       });
 
@@ -203,20 +205,34 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
     }
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
   return (
     <div className="flex flex-col h-full">
       {/* Preview Area */}
-      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#0a0a0a] rounded-2xl mb-4 min-h-[300px]">
-        {/* Current chapter indicator */}
+      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#0a0a0a] rounded-2xl mb-4 min-h-[250px]">
+        {/* Current info */}
         <div className="mb-6 text-center">
-          <span className="text-xs text-gray-500 uppercase tracking-wider">当前章节</span>
-          <h3 className="text-xl font-semibold text-white mt-1">{getCurrentChapter()}</h3>
+          <div className="flex items-center justify-center gap-4 mb-2">
+            <span className="text-2xl font-mono text-indigo-400">
+              {formatTimeString(progress * config.totalDuration)}
+            </span>
+            <span className="text-gray-500">/</span>
+            <span className="text-lg font-mono text-gray-400">
+              {formatTimeString(config.totalDuration)}
+            </span>
+          </div>
+          <div 
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm"
+            style={{ 
+              backgroundColor: currentChapter?.color + '20',
+              color: currentChapter?.color 
+            }}
+          >
+            <div 
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: currentChapter?.color }}
+            />
+            {currentChapter?.name}
+          </div>
         </div>
 
         <div 
@@ -226,7 +242,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
             maxHeight: '100%',
           }}
         >
-          {/* Checkerboard background */}
           <div 
             className="absolute inset-0 rounded-lg opacity-20"
             style={{
@@ -246,14 +261,13 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
             progress={progress}
           />
         </div>
-
       </div>
 
       {/* Progress Scrubber */}
       <div className="mb-4">
         <div className="flex items-center justify-between text-sm text-gray-400 mb-2">
           <span>{Math.round(progress * 100)}%</span>
-          <span>{formatTime(progress * config.totalDuration)} / {formatTime(config.totalDuration)}</span>
+          <span>{formatTimeString(progress * config.totalDuration)} / {formatTimeString(config.totalDuration)}</span>
         </div>
         <input
           type="range"

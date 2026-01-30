@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import type { ProgressBarConfig, Chapter } from '../types';
-import { STYLE_OPTIONS, PRESET_COLOR_SCHEMES } from '../types';
-import { Settings, Palette, Layout, Sparkles, List, Plus, Trash2, GripVertical } from 'lucide-react';
+import { STYLE_OPTIONS, PRESET_COLOR_SCHEMES, formatTimeString, parseTimeString, getChapterDuration } from '../types';
+import { Settings, Palette, Layout, Sparkles, List, Plus, Trash2, Clock } from 'lucide-react';
 
 interface SettingsPanelProps {
   config: ProgressBarConfig;
@@ -82,6 +83,45 @@ const Toggle: React.FC<ToggleProps> = ({ label, checked, onChange }) => (
   </div>
 );
 
+// Time input component
+interface TimeInputProps {
+  value: number;
+  onChange: (seconds: number) => void;
+  max?: number;
+}
+
+const TimeInput: React.FC<TimeInputProps> = ({ value, onChange, max }) => {
+  const [inputValue, setInputValue] = useState(formatTimeString(value));
+  
+  const handleBlur = () => {
+    let seconds = parseTimeString(inputValue);
+    if (max !== undefined && seconds > max) {
+      seconds = max;
+    }
+    if (seconds < 0) seconds = 0;
+    onChange(seconds);
+    setInputValue(formatTimeString(seconds));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleBlur();
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      value={inputValue}
+      onChange={(e) => setInputValue(e.target.value)}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      placeholder="0:00"
+      className="w-16 bg-[#1a1a1a] border border-gray-700 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-indigo-500 font-mono"
+    />
+  );
+};
+
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onChange }) => {
   const updateConfig = <K extends keyof ProgressBarConfig>(
     key: K,
@@ -94,19 +134,30 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onChange }) => {
     const newChapters = config.chapters.map(ch =>
       ch.id === id ? { ...ch, ...updates } : ch
     );
+    // Sort by start time
+    newChapters.sort((a, b) => a.startTime - b.startTime);
     updateConfig('chapters', newChapters);
   };
 
   const addChapter = () => {
     const newId = Date.now().toString();
     const colors = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4'];
+    
+    // Find a good start time (middle of the timeline or after last chapter)
+    const lastChapter = config.chapters[config.chapters.length - 1];
+    const newStartTime = lastChapter 
+      ? Math.min(lastChapter.startTime + 30, config.totalDuration - 10)
+      : 0;
+    
     const newChapter: Chapter = {
       id: newId,
       name: `章节 ${config.chapters.length + 1}`,
-      duration: 10,
+      startTime: newStartTime,
       color: colors[config.chapters.length % colors.length],
     };
-    updateConfig('chapters', [...config.chapters, newChapter]);
+    
+    const newChapters = [...config.chapters, newChapter].sort((a, b) => a.startTime - b.startTime);
+    updateConfig('chapters', newChapters);
   };
 
   const removeChapter = (id: string) => {
@@ -122,18 +173,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onChange }) => {
     updateConfig('chapters', newChapters);
   };
 
-  // Normalize chapter durations to 100%
-  const normalizeChapters = () => {
-    const total = config.chapters.reduce((sum, ch) => sum + ch.duration, 0);
-    if (total === 0) return;
-    const newChapters = config.chapters.map(ch => ({
+  // Handle total duration change
+  const handleTotalDurationChange = (newDuration: number) => {
+    // Adjust chapters that exceed the new duration
+    const adjustedChapters = config.chapters.map(ch => ({
       ...ch,
-      duration: Math.round((ch.duration / total) * 100),
+      startTime: Math.min(ch.startTime, newDuration - 1),
     }));
-    updateConfig('chapters', newChapters);
+    onChange({
+      ...config,
+      totalDuration: newDuration,
+      chapters: adjustedChapters,
+    });
   };
-
-  const totalDuration = config.chapters.reduce((sum, ch) => sum + ch.duration, 0);
 
   return (
     <div className="bg-[#1a1a1a] rounded-2xl p-6 space-y-6 h-full overflow-y-auto">
@@ -161,6 +213,29 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onChange }) => {
         </div>
       </section>
 
+      {/* Video Duration */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <Clock className="w-5 h-5 text-indigo-400" />
+          <h3 className="text-lg font-semibold">视频时长</h3>
+        </div>
+        <div className="bg-[#252525] rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-300">总时长</span>
+            <div className="flex items-center gap-2">
+              <TimeInput
+                value={config.totalDuration}
+                onChange={handleTotalDurationChange}
+              />
+              <span className="text-xs text-gray-500">({config.totalDuration}秒)</span>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500">
+            输入格式: 分:秒 (如 2:30) 或 秒数 (如 150)
+          </p>
+        </div>
+      </section>
+
       {/* Chapter Editor */}
       <section>
         <div className="flex items-center justify-between mb-4">
@@ -177,66 +252,59 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onChange }) => {
           </button>
         </div>
 
-        {/* Total duration warning */}
-        {totalDuration !== 100 && (
-          <div className="mb-3 p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-yellow-400">
-                总时长: {totalDuration}% (应为100%)
-              </span>
-              <button
-                onClick={normalizeChapters}
-                className="text-xs text-yellow-400 hover:text-yellow-300 underline"
+        <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
+          {config.chapters.map((chapter, index) => {
+            const duration = getChapterDuration(config.chapters, index, config.totalDuration);
+            
+            return (
+              <div
+                key={chapter.id}
+                className="bg-[#252525] rounded-xl p-3 space-y-3"
               >
-                自动修正
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
-          {config.chapters.map((chapter) => (
-            <div
-              key={chapter.id}
-              className="bg-[#252525] rounded-xl p-3 space-y-3"
-            >
-              <div className="flex items-center gap-2">
-                <GripVertical className="w-4 h-4 text-gray-500" />
-                <input
-                  type="text"
-                  value={chapter.name}
-                  onChange={(e) => updateChapter(chapter.id, { name: e.target.value })}
-                  className="flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500"
-                  placeholder="章节名称"
-                />
-                <input
-                  type="color"
-                  value={chapter.color || '#6366f1'}
-                  onChange={(e) => updateChapter(chapter.id, { color: e.target.value })}
-                  className="w-8 h-8 rounded cursor-pointer"
-                />
-                <button
-                  onClick={() => removeChapter(chapter.id)}
-                  className="p-1.5 rounded-lg hover:bg-red-500/20 transition-colors"
-                  disabled={config.chapters.length <= 1}
-                >
-                  <Trash2 className={`w-4 h-4 ${config.chapters.length <= 1 ? 'text-gray-600' : 'text-red-400'}`} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: chapter.color }}
+                  />
+                  <input
+                    type="text"
+                    value={chapter.name}
+                    onChange={(e) => updateChapter(chapter.id, { name: e.target.value })}
+                    className="flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500"
+                    placeholder="章节名称"
+                  />
+                  <input
+                    type="color"
+                    value={chapter.color || '#6366f1'}
+                    onChange={(e) => updateChapter(chapter.id, { color: e.target.value })}
+                    className="w-8 h-8 rounded cursor-pointer flex-shrink-0"
+                  />
+                  <button
+                    onClick={() => removeChapter(chapter.id)}
+                    className="p-1.5 rounded-lg hover:bg-red-500/20 transition-colors flex-shrink-0"
+                    disabled={config.chapters.length <= 1}
+                  >
+                    <Trash2 className={`w-4 h-4 ${config.chapters.length <= 1 ? 'text-gray-600' : 'text-red-400'}`} />
+                  </button>
+                </div>
+                
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400 w-14">开始时间</span>
+                    <TimeInput
+                      value={chapter.startTime}
+                      onChange={(seconds) => updateChapter(chapter.id, { startTime: seconds })}
+                      max={config.totalDuration - 1}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <span className="text-xs">时长</span>
+                    <span className="text-xs font-mono text-indigo-400">{formatTimeString(duration)}</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-400 w-12">时长</span>
-                <input
-                  type="range"
-                  min={5}
-                  max={50}
-                  value={chapter.duration}
-                  onChange={(e) => updateChapter(chapter.id, { duration: Number(e.target.value) })}
-                  className="flex-1"
-                />
-                <span className="text-xs text-indigo-400 w-10 text-right">{chapter.duration}%</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Color Schemes */}
@@ -379,14 +447,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onChange }) => {
           <h3 className="text-lg font-semibold">动画设置</h3>
         </div>
         <div className="space-y-4">
-          <Slider
-            label="视频时长"
-            value={config.totalDuration}
-            min={10}
-            max={300}
-            unit="秒"
-            onChange={(v) => updateConfig('totalDuration', v)}
-          />
           <Slider
             label="帧率"
             value={config.fps}

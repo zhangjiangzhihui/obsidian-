@@ -5,18 +5,19 @@ import SettingsPanel from './components/SettingsPanel';
 import PreviewPanel from './components/PreviewPanel';
 import { Sparkles, Menu, X } from 'lucide-react';
 
-// Preset configurations
-const PRESETS: { name: string; config: Partial<ProgressBarConfig> }[] = [
+// Preset configurations with timestamps
+const PRESETS: { name: string; config: Partial<ProgressBarConfig> & { chapters: Chapter[], totalDuration: number } }[] = [
   {
     name: '教程视频',
     config: {
       style: 'modern',
+      totalDuration: 600, // 10 minutes
       chapters: [
-        { id: '1', name: '前言', duration: 10, color: '#6366f1' },
-        { id: '2', name: '准备工作', duration: 15, color: '#8b5cf6' },
-        { id: '3', name: '核心教程', duration: 50, color: '#a855f7' },
-        { id: '4', name: '总结', duration: 15, color: '#d946ef' },
-        { id: '5', name: '彩蛋', duration: 10, color: '#ec4899' },
+        { id: '1', name: '前言', startTime: 0, color: '#6366f1' },
+        { id: '2', name: '准备工作', startTime: 60, color: '#8b5cf6' },
+        { id: '3', name: '核心教程', startTime: 150, color: '#a855f7' },
+        { id: '4', name: '实战演练', startTime: 360, color: '#d946ef' },
+        { id: '5', name: '总结', startTime: 540, color: '#ec4899' },
       ],
     },
   },
@@ -24,11 +25,13 @@ const PRESETS: { name: string; config: Partial<ProgressBarConfig> }[] = [
     name: 'Vlog',
     config: {
       style: 'gradient',
+      totalDuration: 480, // 8 minutes
       chapters: [
-        { id: '1', name: '开场', duration: 15, color: '#f97316' },
-        { id: '2', name: 'Part 1', duration: 30, color: '#fb923c' },
-        { id: '3', name: 'Part 2', duration: 35, color: '#fbbf24' },
-        { id: '4', name: '结尾', duration: 20, color: '#facc15' },
+        { id: '1', name: '开场', startTime: 0, color: '#f97316' },
+        { id: '2', name: '上午', startTime: 45, color: '#fb923c' },
+        { id: '3', name: '下午', startTime: 180, color: '#fbbf24' },
+        { id: '4', name: '晚上', startTime: 330, color: '#facc15' },
+        { id: '5', name: '结尾', startTime: 420, color: '#eab308' },
       ],
     },
   },
@@ -36,11 +39,13 @@ const PRESETS: { name: string; config: Partial<ProgressBarConfig> }[] = [
     name: '游戏视频',
     config: {
       style: 'neon',
+      totalDuration: 900, // 15 minutes
       chapters: [
-        { id: '1', name: 'INTRO', duration: 10, color: '#06b6d4' },
-        { id: '2', name: 'GAMEPLAY', duration: 60, color: '#0ea5e9' },
-        { id: '3', name: 'HIGHLIGHTS', duration: 20, color: '#3b82f6' },
-        { id: '4', name: 'OUTRO', duration: 10, color: '#6366f1' },
+        { id: '1', name: 'INTRO', startTime: 0, color: '#06b6d4' },
+        { id: '2', name: 'GAMEPLAY', startTime: 30, color: '#0ea5e9' },
+        { id: '3', name: 'BOSS战', startTime: 480, color: '#3b82f6' },
+        { id: '4', name: 'HIGHLIGHTS', startTime: 720, color: '#6366f1' },
+        { id: '5', name: 'OUTRO', startTime: 840, color: '#8b5cf6' },
       ],
       backgroundColor: '#0a0a0f',
     },
@@ -49,11 +54,13 @@ const PRESETS: { name: string; config: Partial<ProgressBarConfig> }[] = [
     name: '产品评测',
     config: {
       style: 'glass',
+      totalDuration: 720, // 12 minutes
       chapters: [
-        { id: '1', name: '外观', duration: 20, color: '#10b981' },
-        { id: '2', name: '性能', duration: 30, color: '#14b8a6' },
-        { id: '3', name: '体验', duration: 30, color: '#06b6d4' },
-        { id: '4', name: '总结', duration: 20, color: '#0ea5e9' },
+        { id: '1', name: '开箱', startTime: 0, color: '#10b981' },
+        { id: '2', name: '外观', startTime: 90, color: '#14b8a6' },
+        { id: '3', name: '性能测试', startTime: 240, color: '#06b6d4' },
+        { id: '4', name: '使用体验', startTime: 420, color: '#0ea5e9' },
+        { id: '5', name: '购买建议', startTime: 600, color: '#3b82f6' },
       ],
     },
   },
@@ -61,12 +68,14 @@ const PRESETS: { name: string; config: Partial<ProgressBarConfig> }[] = [
     name: '音乐MV',
     config: {
       style: 'gradient',
+      totalDuration: 240, // 4 minutes
       chapters: [
-        { id: '1', name: '前奏', duration: 15, color: '#e11d48' },
-        { id: '2', name: '主歌', duration: 25, color: '#f43f5e' },
-        { id: '3', name: '副歌', duration: 30, color: '#fb7185' },
-        { id: '4', name: '间奏', duration: 10, color: '#fda4af' },
-        { id: '5', name: '尾声', duration: 20, color: '#fecdd3' },
+        { id: '1', name: '前奏', startTime: 0, color: '#e11d48' },
+        { id: '2', name: '主歌A', startTime: 20, color: '#f43f5e' },
+        { id: '3', name: '副歌', startTime: 70, color: '#fb7185' },
+        { id: '4', name: '主歌B', startTime: 110, color: '#fda4af' },
+        { id: '5', name: '高潮', startTime: 150, color: '#f43f5e' },
+        { id: '6', name: '尾声', startTime: 200, color: '#fecdd3' },
       ],
       glowEffect: true,
       glowIntensity: 25,
@@ -82,7 +91,6 @@ function App() {
     setConfig({
       ...config,
       ...preset.config,
-      chapters: preset.config.chapters as Chapter[],
     });
   };
 
@@ -98,7 +106,7 @@ function App() {
               </div>
               <div>
                 <h1 className="text-lg font-bold">章节进度条生成器</h1>
-                <p className="text-xs text-gray-400 hidden sm:block">为视频创作者打造的章节进度条工具</p>
+                <p className="text-xs text-gray-400 hidden sm:block">使用时间戳定义章节，导出视频进度条素材</p>
               </div>
             </div>
             

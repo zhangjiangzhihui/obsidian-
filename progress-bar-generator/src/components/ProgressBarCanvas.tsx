@@ -19,6 +19,29 @@ const easingFunctions = {
   'ease-in-out': (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
 };
 
+// Helper: Get chapter end time
+function getChapterEndTime(chapters: Chapter[], index: number, totalDuration: number): number {
+  if (index >= chapters.length - 1) {
+    return totalDuration;
+  }
+  return chapters[index + 1].startTime;
+}
+
+// Helper: Get chapter duration
+function getChapterDuration(chapters: Chapter[], index: number, totalDuration: number): number {
+  return getChapterEndTime(chapters, index, totalDuration) - chapters[index].startTime;
+}
+
+// Helper: Get chapter width as percentage
+function getChapterWidthPercent(chapters: Chapter[], index: number, totalDuration: number): number {
+  return getChapterDuration(chapters, index, totalDuration) / totalDuration;
+}
+
+// Helper: Get chapter start as percentage
+function getChapterStartPercent(chapters: Chapter[], index: number, totalDuration: number): number {
+  return chapters[index].startTime / totalDuration;
+}
+
 export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCanvasProps>(
   ({ config, progress }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -27,7 +50,7 @@ export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCan
     const getCanvasHeight = () => {
       if (!config.showChapterNames) return config.height;
       if (config.chapterNamePosition === 'inside') return config.height;
-      return config.height + 35; // Extra space for labels
+      return config.height + 35;
     };
 
     const getBarY = () => {
@@ -119,17 +142,15 @@ function roundRect(
   ctx.closePath();
 }
 
-
 // Helper: Get chapter at progress
-function getChapterAtProgress(chapters: Chapter[], progress: number): { chapter: Chapter; index: number } | null {
-  let accumulated = 0;
-  for (let i = 0; i < chapters.length; i++) {
-    accumulated += chapters[i].duration / 100;
-    if (progress <= accumulated) {
+function getChapterAtProgress(chapters: Chapter[], progress: number, totalDuration: number): { chapter: Chapter; index: number } | null {
+  const currentTime = progress * totalDuration;
+  for (let i = chapters.length - 1; i >= 0; i--) {
+    if (currentTime >= chapters[i].startTime) {
       return { chapter: chapters[i], index: i };
     }
   }
-  return chapters.length > 0 ? { chapter: chapters[chapters.length - 1], index: chapters.length - 1 } : null;
+  return chapters.length > 0 ? { chapter: chapters[0], index: 0 } : null;
 }
 
 // Helper: Format time
@@ -160,49 +181,49 @@ function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: num
   return truncated + '…';
 }
 
-// Modern Style - Text on bar
+// Modern Style
 function renderModernStyle(
   ctx: CanvasRenderingContext2D,
   config: ProgressBarConfig,
   progress: number,
   barY: number
 ) {
-  const { width, height, chapters, borderRadius, backgroundColor, showChapterDividers, showChapterNames, chapterNamePosition } = config;
+  const { width, height, chapters, borderRadius, backgroundColor, showChapterDividers, showChapterNames, chapterNamePosition, totalDuration } = config;
   
   // Background
   ctx.fillStyle = backgroundColor;
   roundRect(ctx, 0, barY, width, height, borderRadius);
   ctx.fill();
 
-  // Draw chapters
-  let xOffset = 0;
-  const currentChapter = getChapterAtProgress(chapters, progress);
+  const currentChapter = getChapterAtProgress(chapters, progress, totalDuration);
 
   chapters.forEach((chapter, index) => {
-    const chapterWidth = (chapter.duration / 100) * width;
-    const chapterEnd = (xOffset + chapterWidth) / width;
-    const chapterStart = xOffset / width;
+    const chapterStartPercent = getChapterStartPercent(chapters, index, totalDuration);
+    const chapterWidthPercent = getChapterWidthPercent(chapters, index, totalDuration);
+    const chapterX = chapterStartPercent * width;
+    const chapterW = chapterWidthPercent * width;
+    const chapterEndPercent = chapterStartPercent + chapterWidthPercent;
     
     // Calculate fill for this chapter
     let fillWidth = 0;
-    if (progress >= chapterEnd) {
-      fillWidth = chapterWidth;
-    } else if (progress > chapterStart) {
-      fillWidth = (progress - chapterStart) * width;
+    if (progress >= chapterEndPercent) {
+      fillWidth = chapterW;
+    } else if (progress > chapterStartPercent) {
+      fillWidth = (progress - chapterStartPercent) * width;
     }
 
-    // Draw chapter section background
+    // Draw chapter section
     ctx.save();
     roundRect(ctx, 0, barY, width, height, borderRadius);
     ctx.clip();
     
-    // Chapter background with subtle color
+    // Chapter background
     ctx.fillStyle = hexToRgba(chapter.color || config.progressColor, 0.1);
-    ctx.fillRect(xOffset, barY, chapterWidth, height);
+    ctx.fillRect(chapterX, barY, chapterW, height);
 
     // Draw filled progress
     if (fillWidth > 0) {
-      const gradient = ctx.createLinearGradient(xOffset, 0, xOffset + fillWidth, 0);
+      const gradient = ctx.createLinearGradient(chapterX, 0, chapterX + fillWidth, 0);
       gradient.addColorStop(0, chapter.color || config.progressColor);
       gradient.addColorStop(1, lightenColor(chapter.color || config.progressColor, 15));
       
@@ -212,7 +233,7 @@ function renderModernStyle(
       }
       
       ctx.fillStyle = gradient;
-      ctx.fillRect(xOffset, barY, fillWidth, height);
+      ctx.fillRect(chapterX, barY, fillWidth, height);
       ctx.shadowBlur = 0;
     }
 
@@ -221,14 +242,14 @@ function renderModernStyle(
     // Draw chapter divider
     if (showChapterDividers && index < chapters.length - 1) {
       ctx.fillStyle = hexToRgba('#ffffff', 0.4);
-      ctx.fillRect(xOffset + chapterWidth - 1, barY + 6, 2, height - 12);
+      ctx.fillRect(chapterX + chapterW - 1, barY + 6, 2, height - 12);
     }
 
-    // Draw chapter name ON the bar
+    // Draw chapter name
     if (showChapterNames) {
       const isActive = currentChapter?.index === index;
-      const centerX = xOffset + chapterWidth / 2;
-      const maxTextWidth = chapterWidth - 20;
+      const centerX = chapterX + chapterW / 2;
+      const maxTextWidth = chapterW - 20;
       
       ctx.font = `${getFontWeight(isActive ? 'bold' : config.fontWeight)} ${config.fontSize}px Inter, -apple-system, sans-serif`;
       ctx.textAlign = 'center';
@@ -237,11 +258,9 @@ function renderModernStyle(
       const displayText = truncateText(ctx, chapter.name, maxTextWidth);
       
       if (chapterNamePosition === 'above') {
-        // Text above bar
         ctx.fillStyle = isActive ? config.textColor : hexToRgba(config.textColor, 0.6);
         ctx.fillText(displayText, centerX, 14);
         
-        // Small indicator triangle
         if (isActive) {
           ctx.beginPath();
           ctx.moveTo(centerX - 6, 26);
@@ -252,22 +271,19 @@ function renderModernStyle(
           ctx.fill();
         }
       } else if (chapterNamePosition === 'inside') {
-        // Text inside bar - with background for readability
         const textMetrics = ctx.measureText(displayText);
         const textWidth = textMetrics.width + 16;
         const textHeight = config.fontSize + 8;
         const textX = centerX - textWidth / 2;
         const textY = barY + (height - textHeight) / 2;
         
-        // Text background pill
-        const isFilled = fillWidth >= chapterWidth / 2;
+        const isFilled = fillWidth >= chapterW / 2;
         ctx.fillStyle = isFilled 
           ? hexToRgba('#000000', 0.3)
           : hexToRgba(chapter.color || config.progressColor, 0.15);
         roundRect(ctx, textX, textY, textWidth, textHeight, textHeight / 2);
         ctx.fill();
         
-        // Text
         ctx.fillStyle = isFilled ? '#ffffff' : hexToRgba(config.textColor, 0.9);
         if (isActive) {
           ctx.shadowColor = isFilled ? 'rgba(0,0,0,0.5)' : chapter.color || config.progressColor;
@@ -276,19 +292,16 @@ function renderModernStyle(
         ctx.fillText(displayText, centerX, barY + height / 2);
         ctx.shadowBlur = 0;
       } else {
-        // Text below bar
         ctx.fillStyle = isActive ? config.textColor : hexToRgba(config.textColor, 0.6);
         ctx.fillText(displayText, centerX, barY + height + 20);
       }
     }
-
-    xOffset += chapterWidth;
   });
 
-  // Draw time code on the right
+  // Draw time code
   if (config.showTimeCode && chapterNamePosition !== 'inside') {
-    const currentTime = progress * config.totalDuration;
-    const timeText = `${formatTime(currentTime)} / ${formatTime(config.totalDuration)}`;
+    const currentTime = progress * totalDuration;
+    const timeText = `${formatTime(currentTime)} / ${formatTime(totalDuration)}`;
     
     ctx.font = `500 ${config.fontSize - 2}px Inter, monospace`;
     ctx.fillStyle = hexToRgba(config.textColor, 0.7);
@@ -297,10 +310,9 @@ function renderModernStyle(
     ctx.fillText(timeText, width - 12, barY + height / 2);
   }
 
-  // Draw progress indicator dot
+  // Draw progress indicator
   const progressX = progress * width;
   if (progressX > 0 && progressX < width) {
-    // Outer glow
     if (config.glowEffect) {
       ctx.beginPath();
       ctx.arc(progressX, barY + height / 2, 10, 0, Math.PI * 2);
@@ -308,13 +320,11 @@ function renderModernStyle(
       ctx.fill();
     }
     
-    // White dot
     ctx.beginPath();
     ctx.arc(progressX, barY + height / 2, 7, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
     
-    // Colored center
     ctx.beginPath();
     ctx.arc(progressX, barY + height / 2, 4, 0, Math.PI * 2);
     ctx.fillStyle = currentChapter?.chapter.color || config.progressColor;
@@ -329,54 +339,55 @@ function renderMinimalStyle(
   progress: number,
   barY: number
 ) {
-  const { width, height, chapters, borderRadius, backgroundColor, showChapterNames, chapterNamePosition } = config;
+  const { width, height, chapters, borderRadius, backgroundColor, showChapterNames, chapterNamePosition, totalDuration } = config;
   
   const barHeight = chapterNamePosition === 'inside' ? height : height * 0.5;
   const barYOffset = chapterNamePosition === 'inside' ? barY : barY + (height - barHeight) / 2;
 
-  // Background
   ctx.fillStyle = backgroundColor;
   roundRect(ctx, 0, barYOffset, width, barHeight, borderRadius / 2);
   ctx.fill();
 
-  // Draw chapters
-  let xOffset = 0;
-  const currentChapter = getChapterAtProgress(chapters, progress);
+  const currentChapter = getChapterAtProgress(chapters, progress, totalDuration);
 
   ctx.save();
   roundRect(ctx, 0, barYOffset, width, barHeight, borderRadius / 2);
   ctx.clip();
 
-  chapters.forEach((chapter) => {
-    const chapterWidth = (chapter.duration / 100) * width;
-    const chapterEnd = (xOffset + chapterWidth) / width;
-    const chapterStart = xOffset / width;
+  chapters.forEach((chapter, index) => {
+    const chapterStartPercent = getChapterStartPercent(chapters, index, totalDuration);
+    const chapterWidthPercent = getChapterWidthPercent(chapters, index, totalDuration);
+    const chapterX = chapterStartPercent * width;
+    const chapterW = chapterWidthPercent * width;
+    const chapterEndPercent = chapterStartPercent + chapterWidthPercent;
     
     let fillWidth = 0;
-    if (progress >= chapterEnd) {
-      fillWidth = chapterWidth;
-    } else if (progress > chapterStart) {
-      fillWidth = (progress - chapterStart) * width;
+    if (progress >= chapterEndPercent) {
+      fillWidth = chapterW;
+    } else if (progress > chapterStartPercent) {
+      fillWidth = (progress - chapterStartPercent) * width;
     }
 
     if (fillWidth > 0) {
       ctx.fillStyle = chapter.color || config.progressColor;
-      ctx.fillRect(xOffset, barYOffset, fillWidth, barHeight);
+      ctx.fillRect(chapterX, barYOffset, fillWidth, barHeight);
     }
-
-    xOffset += chapterWidth;
   });
 
   ctx.restore();
 
-  // Draw chapter names
+  // Chapter names and dividers
   if (showChapterNames) {
-    xOffset = 0;
     chapters.forEach((chapter, index) => {
-      const chapterWidth = (chapter.duration / 100) * width;
+      const chapterStartPercent = getChapterStartPercent(chapters, index, totalDuration);
+      const chapterWidthPercent = getChapterWidthPercent(chapters, index, totalDuration);
+      const chapterX = chapterStartPercent * width;
+      const chapterW = chapterWidthPercent * width;
+      const chapterEndPercent = chapterStartPercent + chapterWidthPercent;
+      
       const isActive = currentChapter?.index === index;
-      const centerX = xOffset + chapterWidth / 2;
-      const maxTextWidth = chapterWidth - 16;
+      const centerX = chapterX + chapterW / 2;
+      const maxTextWidth = chapterW - 16;
       
       ctx.font = `${getFontWeight(isActive ? 'bold' : config.fontWeight)} ${config.fontSize}px Inter, -apple-system, sans-serif`;
       ctx.textAlign = 'center';
@@ -388,8 +399,7 @@ function renderMinimalStyle(
         ctx.fillStyle = isActive ? chapter.color || config.textColor : hexToRgba(config.textColor, 0.5);
         ctx.fillText(displayText, centerX, barY + 10);
       } else if (chapterNamePosition === 'inside') {
-        const chapterEnd = (xOffset + chapterWidth) / width;
-        const isFilled = progress >= chapterEnd;
+        const isFilled = progress >= chapterEndPercent;
         ctx.fillStyle = isFilled ? '#ffffff' : hexToRgba(config.textColor, 0.7);
         ctx.fillText(displayText, centerX, barYOffset + barHeight / 2);
       } else {
@@ -397,15 +407,12 @@ function renderMinimalStyle(
         ctx.fillText(displayText, centerX, barY + height - 5);
       }
 
-      // Small dot divider
       if (index < chapters.length - 1) {
         ctx.beginPath();
-        ctx.arc(xOffset + chapterWidth, barYOffset + barHeight / 2, 3, 0, Math.PI * 2);
+        ctx.arc(chapterX + chapterW, barYOffset + barHeight / 2, 3, 0, Math.PI * 2);
         ctx.fillStyle = hexToRgba(config.textColor, 0.3);
         ctx.fill();
       }
-
-      xOffset += chapterWidth;
     });
   }
 }
@@ -417,68 +424,63 @@ function renderNeonStyle(
   progress: number,
   barY: number
 ) {
-  const { width, height, chapters, borderRadius, showChapterNames, chapterNamePosition } = config;
+  const { width, height, chapters, borderRadius, showChapterNames, chapterNamePosition, totalDuration } = config;
   
-  // Dark background with border
   ctx.fillStyle = '#0a0a12';
   roundRect(ctx, 0, barY, width, height, borderRadius);
   ctx.fill();
   
-  // Animated border glow
   ctx.strokeStyle = hexToRgba('#ffffff', 0.1);
   ctx.lineWidth = 1;
   roundRect(ctx, 0, barY, width, height, borderRadius);
   ctx.stroke();
 
-  let xOffset = 0;
-  const currentChapter = getChapterAtProgress(chapters, progress);
+  const currentChapter = getChapterAtProgress(chapters, progress, totalDuration);
 
   ctx.save();
   roundRect(ctx, 0, barY, width, height, borderRadius);
   ctx.clip();
 
   chapters.forEach((chapter, index) => {
-    const chapterWidth = (chapter.duration / 100) * width;
-    const chapterEnd = (xOffset + chapterWidth) / width;
-    const chapterStart = xOffset / width;
+    const chapterStartPercent = getChapterStartPercent(chapters, index, totalDuration);
+    const chapterWidthPercent = getChapterWidthPercent(chapters, index, totalDuration);
+    const chapterX = chapterStartPercent * width;
+    const chapterW = chapterWidthPercent * width;
+    const chapterEndPercent = chapterStartPercent + chapterWidthPercent;
     
     let fillWidth = 0;
-    if (progress >= chapterEnd) {
-      fillWidth = chapterWidth;
-    } else if (progress > chapterStart) {
-      fillWidth = (progress - chapterStart) * width;
+    if (progress >= chapterEndPercent) {
+      fillWidth = chapterW;
+    } else if (progress > chapterStartPercent) {
+      fillWidth = (progress - chapterStartPercent) * width;
     }
 
     const color = chapter.color || config.progressColor;
 
-    // Subtle glow background for each section
     ctx.fillStyle = hexToRgba(color, 0.05);
-    ctx.fillRect(xOffset, barY, chapterWidth, height);
+    ctx.fillRect(chapterX, barY, chapterW, height);
 
     if (fillWidth > 0) {
-      // Multiple glow layers for neon effect
       ctx.shadowColor = color;
       ctx.shadowBlur = 25;
       ctx.fillStyle = hexToRgba(color, 0.6);
-      ctx.fillRect(xOffset, barY, fillWidth, height);
+      ctx.fillRect(chapterX, barY, fillWidth, height);
       
       ctx.shadowBlur = 12;
       ctx.fillStyle = color;
-      ctx.fillRect(xOffset, barY + height * 0.25, fillWidth, height * 0.5);
+      ctx.fillRect(chapterX, barY + height * 0.25, fillWidth, height * 0.5);
       
-      // Bright center line
       ctx.shadowBlur = 8;
       ctx.fillStyle = lightenColor(color, 30);
-      ctx.fillRect(xOffset, barY + height * 0.4, fillWidth, height * 0.2);
+      ctx.fillRect(chapterX, barY + height * 0.4, fillWidth, height * 0.2);
       
       ctx.shadowBlur = 0;
     }
 
-    // Draw chapter name with neon glow
     if (showChapterNames) {
       const isActive = currentChapter?.index === index;
-      const centerX = xOffset + chapterWidth / 2;
-      const maxTextWidth = chapterWidth - 16;
+      const centerX = chapterX + chapterW / 2;
+      const maxTextWidth = chapterW - 16;
       
       ctx.font = `${getFontWeight(isActive ? 'bold' : config.fontWeight)} ${config.fontSize}px Inter, -apple-system, sans-serif`;
       ctx.textAlign = 'center';
@@ -505,16 +507,13 @@ function renderNeonStyle(
       ctx.shadowBlur = 0;
     }
 
-    // Neon divider line
     if (index < chapters.length - 1) {
       ctx.shadowColor = '#ffffff';
       ctx.shadowBlur = 5;
       ctx.fillStyle = hexToRgba('#ffffff', 0.3);
-      ctx.fillRect(xOffset + chapterWidth - 1, barY + 10, 2, height - 20);
+      ctx.fillRect(chapterX + chapterW - 1, barY + 10, 2, height - 20);
       ctx.shadowBlur = 0;
     }
-
-    xOffset += chapterWidth;
   });
 
   ctx.restore();
@@ -527,9 +526,8 @@ function renderGlassStyle(
   progress: number,
   barY: number
 ) {
-  const { width, height, chapters, borderRadius, showChapterNames, chapterNamePosition } = config;
+  const { width, height, chapters, borderRadius, showChapterNames, chapterNamePosition, totalDuration } = config;
   
-  // Glass background
   const glassGradient = ctx.createLinearGradient(0, barY, 0, barY + height);
   glassGradient.addColorStop(0, hexToRgba('#ffffff', 0.18));
   glassGradient.addColorStop(0.4, hexToRgba('#ffffff', 0.08));
@@ -540,35 +538,34 @@ function renderGlassStyle(
   roundRect(ctx, 0, barY, width, height, borderRadius);
   ctx.fill();
   
-  // Glass border
   ctx.strokeStyle = hexToRgba('#ffffff', 0.25);
   ctx.lineWidth = 1;
   roundRect(ctx, 0, barY, width, height, borderRadius);
   ctx.stroke();
 
-  let xOffset = 0;
-  const currentChapter = getChapterAtProgress(chapters, progress);
+  const currentChapter = getChapterAtProgress(chapters, progress, totalDuration);
 
   ctx.save();
   roundRect(ctx, 0, barY, width, height, borderRadius);
   ctx.clip();
 
   chapters.forEach((chapter, index) => {
-    const chapterWidth = (chapter.duration / 100) * width;
-    const chapterEnd = (xOffset + chapterWidth) / width;
-    const chapterStart = xOffset / width;
+    const chapterStartPercent = getChapterStartPercent(chapters, index, totalDuration);
+    const chapterWidthPercent = getChapterWidthPercent(chapters, index, totalDuration);
+    const chapterX = chapterStartPercent * width;
+    const chapterW = chapterWidthPercent * width;
+    const chapterEndPercent = chapterStartPercent + chapterWidthPercent;
     
     let fillWidth = 0;
-    if (progress >= chapterEnd) {
-      fillWidth = chapterWidth;
-    } else if (progress > chapterStart) {
-      fillWidth = (progress - chapterStart) * width;
+    if (progress >= chapterEndPercent) {
+      fillWidth = chapterW;
+    } else if (progress > chapterStartPercent) {
+      fillWidth = (progress - chapterStartPercent) * width;
     }
 
     const color = chapter.color || config.progressColor;
 
     if (fillWidth > 0) {
-      // Glass-like fill gradient
       const fillGradient = ctx.createLinearGradient(0, barY, 0, barY + height);
       fillGradient.addColorStop(0, hexToRgba(color, 0.95));
       fillGradient.addColorStop(0.3, hexToRgba(color, 0.8));
@@ -576,18 +573,16 @@ function renderGlassStyle(
       fillGradient.addColorStop(1, hexToRgba(color, 0.85));
       
       ctx.fillStyle = fillGradient;
-      ctx.fillRect(xOffset, barY, fillWidth, height);
+      ctx.fillRect(chapterX, barY, fillWidth, height);
       
-      // Top highlight
       ctx.fillStyle = hexToRgba('#ffffff', 0.35);
-      ctx.fillRect(xOffset, barY, fillWidth, height * 0.35);
+      ctx.fillRect(chapterX, barY, fillWidth, height * 0.35);
     }
 
-    // Chapter name
     if (showChapterNames) {
       const isActive = currentChapter?.index === index;
-      const centerX = xOffset + chapterWidth / 2;
-      const maxTextWidth = chapterWidth - 16;
+      const centerX = chapterX + chapterW / 2;
+      const maxTextWidth = chapterW - 16;
       
       ctx.font = `${getFontWeight(isActive ? 'bold' : config.fontWeight)} ${config.fontSize}px Inter, -apple-system, sans-serif`;
       ctx.textAlign = 'center';
@@ -599,7 +594,6 @@ function renderGlassStyle(
         ctx.fillStyle = isActive ? config.textColor : hexToRgba(config.textColor, 0.6);
         ctx.fillText(displayText, centerX, 14);
       } else if (chapterNamePosition === 'inside') {
-        // Text with shadow for glass effect
         ctx.shadowColor = 'rgba(0,0,0,0.4)';
         ctx.shadowBlur = 3;
         ctx.shadowOffsetY = 1;
@@ -613,16 +607,13 @@ function renderGlassStyle(
       }
     }
 
-    // Glass divider
     if (index < chapters.length - 1) {
-      const divX = xOffset + chapterWidth;
+      const divX = chapterX + chapterW;
       ctx.fillStyle = hexToRgba('#ffffff', 0.35);
       ctx.fillRect(divX - 1, barY + 6, 1, height - 12);
       ctx.fillStyle = hexToRgba('#000000', 0.15);
       ctx.fillRect(divX, barY + 6, 1, height - 12);
     }
-
-    xOffset += chapterWidth;
   });
 
   ctx.restore();
@@ -635,39 +626,29 @@ function renderGradientStyle(
   progress: number,
   barY: number
 ) {
-  const { width, height, chapters, borderRadius, backgroundColor, showChapterNames, chapterNamePosition } = config;
+  const { width, height, chapters, borderRadius, backgroundColor, showChapterNames, chapterNamePosition, totalDuration } = config;
   
-  // Background
   ctx.fillStyle = backgroundColor;
   roundRect(ctx, 0, barY, width, height, borderRadius);
   ctx.fill();
 
-  let xOffset = 0;
-  const currentChapter = getChapterAtProgress(chapters, progress);
+  const currentChapter = getChapterAtProgress(chapters, progress, totalDuration);
   const progressX = progress * width;
 
   ctx.save();
   roundRect(ctx, 0, barY, width, height, borderRadius);
   ctx.clip();
 
-  // Create smooth gradient across all chapters
   if (progressX > 0) {
-    const fullGradient = ctx.createLinearGradient(0, 0, progressX, 0);
-    let gradientOffset = 0;
+    const fullGradient = ctx.createLinearGradient(0, 0, width, 0);
     
-    chapters.forEach((chapter) => {
-      const chapterRatio = chapter.duration / 100;
+    chapters.forEach((chapter, index) => {
+      const chapterStartPercent = getChapterStartPercent(chapters, index, totalDuration);
+      const chapterEndPercent = chapterStartPercent + getChapterWidthPercent(chapters, index, totalDuration);
       const color = chapter.color || config.progressColor;
       
-      // Add gradient stops for smooth transition
-      if (gradientOffset > 0) {
-        fullGradient.addColorStop(Math.max(0, gradientOffset - 0.01), color);
-      }
-      fullGradient.addColorStop(gradientOffset, color);
-      gradientOffset += chapterRatio;
-      if (gradientOffset < 1) {
-        fullGradient.addColorStop(Math.min(1, gradientOffset), color);
-      }
+      fullGradient.addColorStop(chapterStartPercent, color);
+      fullGradient.addColorStop(Math.min(chapterEndPercent, 0.999), color);
     });
 
     if (config.glowEffect) {
@@ -678,21 +659,22 @@ function renderGradientStyle(
     ctx.fillStyle = fullGradient;
     ctx.fillRect(0, barY, progressX, height);
     
-    // Top highlight
     ctx.shadowBlur = 0;
     ctx.fillStyle = hexToRgba('#ffffff', 0.2);
     ctx.fillRect(0, barY, progressX, height * 0.4);
   }
 
-  // Chapter markers and names
-  xOffset = 0;
+  // Chapter names and dividers
   chapters.forEach((chapter, index) => {
-    const chapterWidth = (chapter.duration / 100) * width;
+    const chapterStartPercent = getChapterStartPercent(chapters, index, totalDuration);
+    const chapterWidthPercent = getChapterWidthPercent(chapters, index, totalDuration);
+    const chapterX = chapterStartPercent * width;
+    const chapterW = chapterWidthPercent * width;
 
     if (showChapterNames) {
       const isActive = currentChapter?.index === index;
-      const centerX = xOffset + chapterWidth / 2;
-      const maxTextWidth = chapterWidth - 20;
+      const centerX = chapterX + chapterW / 2;
+      const maxTextWidth = chapterW - 20;
       
       ctx.font = `${getFontWeight(isActive ? 'bold' : config.fontWeight)} ${config.fontSize}px Inter, -apple-system, sans-serif`;
       ctx.textAlign = 'center';
@@ -718,9 +700,8 @@ function renderGradientStyle(
       }
     }
 
-    // Diamond divider
     if (index < chapters.length - 1) {
-      const divX = xOffset + chapterWidth;
+      const divX = chapterX + chapterW;
       ctx.save();
       ctx.translate(divX, barY + height / 2);
       ctx.rotate(Math.PI / 4);
@@ -728,17 +709,13 @@ function renderGradientStyle(
       ctx.fillRect(-4, -4, 8, 8);
       ctx.restore();
     }
-
-    xOffset += chapterWidth;
   });
 
   ctx.restore();
 
-  // Progress indicator
   if (progressX > 0 && progressX < width) {
     const headColor = currentChapter?.chapter.color || config.progressColor;
     
-    // Glow
     if (config.glowEffect) {
       ctx.beginPath();
       ctx.arc(progressX, barY + height / 2, 12, 0, Math.PI * 2);
@@ -746,13 +723,11 @@ function renderGradientStyle(
       ctx.fill();
     }
     
-    // White outer ring
     ctx.beginPath();
     ctx.arc(progressX, barY + height / 2, 8, 0, Math.PI * 2);
     ctx.fillStyle = '#ffffff';
     ctx.fill();
     
-    // Colored center
     ctx.beginPath();
     ctx.arc(progressX, barY + height / 2, 5, 0, Math.PI * 2);
     ctx.fillStyle = headColor;
