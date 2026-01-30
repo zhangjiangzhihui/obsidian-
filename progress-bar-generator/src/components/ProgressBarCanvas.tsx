@@ -104,31 +104,35 @@ export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCan
       // Clear canvas
       ctx.clearRect(0, 0, config.width, canvasHeight);
 
-      // Render progress bar style
-      // Pass mascot info so it can replace the progress indicator
+      // Render progress bar style (without chapter names first)
       const hasMascotOnBar = config.mascot.type !== 'none' && config.mascot.position === 'on-bar';
       
       switch (config.style) {
         case 'modern':
-          renderModernStyle(ctx, config, easedProgress, barY, hasMascotOnBar);
+          renderModernStyle(ctx, config, easedProgress, barY, hasMascotOnBar, false);
           break;
         case 'minimal':
-          renderMinimalStyle(ctx, config, easedProgress, barY, hasMascotOnBar);
+          renderMinimalStyle(ctx, config, easedProgress, barY, hasMascotOnBar, false);
           break;
         case 'neon':
-          renderNeonStyle(ctx, config, easedProgress, barY, hasMascotOnBar);
+          renderNeonStyle(ctx, config, easedProgress, barY, hasMascotOnBar, false);
           break;
         case 'glass':
-          renderGlassStyle(ctx, config, easedProgress, barY, hasMascotOnBar);
+          renderGlassStyle(ctx, config, easedProgress, barY, hasMascotOnBar, false);
           break;
         case 'gradient':
-          renderGradientStyle(ctx, config, easedProgress, barY, hasMascotOnBar);
+          renderGradientStyle(ctx, config, easedProgress, barY, hasMascotOnBar, false);
           break;
       }
       
-      // Render mascot last (on top of progress bar, below chapter names which are drawn by style)
+      // Render mascot
       if (config.mascot.type !== 'none') {
         renderMascot(ctx, config, easedProgress, barY, currentProgress);
+      }
+      
+      // Render chapter names LAST (on top of everything)
+      if (config.showChapterNames) {
+        renderChapterNames(ctx, config, easedProgress, barY);
       }
     };
 
@@ -216,15 +220,94 @@ function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: num
   return truncated + '…';
 }
 
+// Render chapter names (separate function to draw on top)
+function renderChapterNames(
+  ctx: CanvasRenderingContext2D,
+  config: ProgressBarConfig,
+  progress: number,
+  barY: number
+) {
+  const { width, height, chapters, chapterNamePosition, totalDuration } = config;
+  const currentChapter = getChapterAtProgress(chapters, progress, totalDuration);
+
+  chapters.forEach((chapter, index) => {
+    const chapterStartPercent = getChapterStartPercent(chapters, index, totalDuration);
+    const chapterWidthPercent = getChapterWidthPercent(chapters, index, totalDuration);
+    const chapterX = chapterStartPercent * width;
+    const chapterW = chapterWidthPercent * width;
+    const chapterEndPercent = chapterStartPercent + chapterWidthPercent;
+
+    const isActive = currentChapter?.index === index;
+    const centerX = chapterX + chapterW / 2;
+    const maxTextWidth = chapterW - 20;
+
+    ctx.font = `${getFontWeight(isActive ? 'bold' : config.fontWeight)} ${config.fontSize}px Inter, -apple-system, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const displayText = truncateText(ctx, chapter.name, maxTextWidth);
+
+    // Calculate fill status for this chapter
+    let fillRatio = 0;
+    if (progress >= chapterEndPercent) {
+      fillRatio = 1;
+    } else if (progress > chapterStartPercent) {
+      fillRatio = (progress - chapterStartPercent) / chapterWidthPercent;
+    }
+
+    if (chapterNamePosition === 'above') {
+      ctx.fillStyle = isActive ? config.textColor : hexToRgba(config.textColor, 0.6);
+      ctx.fillText(displayText, centerX, 14);
+
+      if (isActive) {
+        ctx.beginPath();
+        ctx.moveTo(centerX - 6, 26);
+        ctx.lineTo(centerX + 6, 26);
+        ctx.lineTo(centerX, barY);
+        ctx.closePath();
+        ctx.fillStyle = chapter.color || config.progressColor;
+        ctx.fill();
+      }
+    } else if (chapterNamePosition === 'inside') {
+      // Draw text background pill for better readability
+      const textMetrics = ctx.measureText(displayText);
+      const textWidth = textMetrics.width + 16;
+      const textHeight = config.fontSize + 8;
+      const textBgX = centerX - textWidth / 2;
+      const textBgY = barY + (height - textHeight) / 2;
+
+      const isFilled = fillRatio > 0.5;
+      ctx.fillStyle = isFilled
+        ? hexToRgba('#000000', 0.4)
+        : hexToRgba(chapter.color || config.progressColor, 0.2);
+      roundRect(ctx, textBgX, textBgY, textWidth, textHeight, textHeight / 2);
+      ctx.fill();
+
+      ctx.fillStyle = isFilled ? '#ffffff' : hexToRgba(config.textColor, 0.9);
+      if (isActive) {
+        ctx.shadowColor = isFilled ? 'rgba(0,0,0,0.5)' : (chapter.color || config.progressColor);
+        ctx.shadowBlur = 4;
+      }
+      ctx.fillText(displayText, centerX, barY + height / 2);
+      ctx.shadowBlur = 0;
+    } else {
+      // below
+      ctx.fillStyle = isActive ? config.textColor : hexToRgba(config.textColor, 0.6);
+      ctx.fillText(displayText, centerX, barY + height + 20);
+    }
+  });
+}
+
 // Modern Style
 function renderModernStyle(
   ctx: CanvasRenderingContext2D,
   config: ProgressBarConfig,
   progress: number,
   barY: number,
-  hideDot: boolean = false
+  hideDot: boolean = false,
+  _skipNames: boolean = false
 ) {
-  const { width, height, chapters, borderRadius, backgroundColor, showChapterDividers, showChapterNames, chapterNamePosition, totalDuration } = config;
+  const { width, height, chapters, borderRadius, backgroundColor, showChapterDividers, totalDuration } = config;
   
   // Background
   ctx.fillStyle = backgroundColor;
@@ -280,62 +363,11 @@ function renderModernStyle(
       ctx.fillStyle = hexToRgba('#ffffff', 0.4);
       ctx.fillRect(chapterX + chapterW - 1, barY + 6, 2, height - 12);
     }
-
-    // Draw chapter name
-    if (showChapterNames) {
-      const isActive = currentChapter?.index === index;
-      const centerX = chapterX + chapterW / 2;
-      const maxTextWidth = chapterW - 20;
-      
-      ctx.font = `${getFontWeight(isActive ? 'bold' : config.fontWeight)} ${config.fontSize}px Inter, -apple-system, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      const displayText = truncateText(ctx, chapter.name, maxTextWidth);
-      
-      if (chapterNamePosition === 'above') {
-        ctx.fillStyle = isActive ? config.textColor : hexToRgba(config.textColor, 0.6);
-        ctx.fillText(displayText, centerX, 14);
-        
-        if (isActive) {
-          ctx.beginPath();
-          ctx.moveTo(centerX - 6, 26);
-          ctx.lineTo(centerX + 6, 26);
-          ctx.lineTo(centerX, barY);
-          ctx.closePath();
-          ctx.fillStyle = chapter.color || config.progressColor;
-          ctx.fill();
-        }
-      } else if (chapterNamePosition === 'inside') {
-        const textMetrics = ctx.measureText(displayText);
-        const textWidth = textMetrics.width + 16;
-        const textHeight = config.fontSize + 8;
-        const textX = centerX - textWidth / 2;
-        const textY = barY + (height - textHeight) / 2;
-        
-        const isFilled = fillWidth >= chapterW / 2;
-        ctx.fillStyle = isFilled 
-          ? hexToRgba('#000000', 0.3)
-          : hexToRgba(chapter.color || config.progressColor, 0.15);
-        roundRect(ctx, textX, textY, textWidth, textHeight, textHeight / 2);
-        ctx.fill();
-        
-        ctx.fillStyle = isFilled ? '#ffffff' : hexToRgba(config.textColor, 0.9);
-        if (isActive) {
-          ctx.shadowColor = isFilled ? 'rgba(0,0,0,0.5)' : chapter.color || config.progressColor;
-          ctx.shadowBlur = 4;
-        }
-        ctx.fillText(displayText, centerX, barY + height / 2);
-        ctx.shadowBlur = 0;
-      } else {
-        ctx.fillStyle = isActive ? config.textColor : hexToRgba(config.textColor, 0.6);
-        ctx.fillText(displayText, centerX, barY + height + 20);
-      }
-    }
+    // Chapter names are now drawn separately after mascot
   });
 
   // Draw time code
-  if (config.showTimeCode && chapterNamePosition !== 'inside') {
+  if (config.showTimeCode && config.chapterNamePosition !== 'inside') {
     const currentTime = progress * totalDuration;
     const timeText = `${formatTime(currentTime)} / ${formatTime(totalDuration)}`;
     
@@ -376,9 +408,10 @@ function renderMinimalStyle(
   config: ProgressBarConfig,
   progress: number,
   barY: number,
-  _hideDot: boolean = false
+  _hideDot: boolean = false,
+  _skipNames: boolean = false
 ) {
-  const { width, height, chapters, borderRadius, backgroundColor, showChapterNames, chapterNamePosition, totalDuration } = config;
+  const { width, height, chapters, borderRadius, backgroundColor, chapterNamePosition, totalDuration } = config;
   
   const barHeight = chapterNamePosition === 'inside' ? height : height * 0.5;
   const barYOffset = chapterNamePosition === 'inside' ? barY : barY + (height - barHeight) / 2;
@@ -386,8 +419,6 @@ function renderMinimalStyle(
   ctx.fillStyle = backgroundColor;
   roundRect(ctx, 0, barYOffset, width, barHeight, borderRadius / 2);
   ctx.fill();
-
-  const currentChapter = getChapterAtProgress(chapters, progress, totalDuration);
 
   ctx.save();
   roundRect(ctx, 0, barYOffset, width, barHeight, borderRadius / 2);
@@ -414,46 +445,7 @@ function renderMinimalStyle(
   });
 
   ctx.restore();
-
-  // Chapter names and dividers
-  if (showChapterNames) {
-    chapters.forEach((chapter, index) => {
-      const chapterStartPercent = getChapterStartPercent(chapters, index, totalDuration);
-      const chapterWidthPercent = getChapterWidthPercent(chapters, index, totalDuration);
-      const chapterX = chapterStartPercent * width;
-      const chapterW = chapterWidthPercent * width;
-      const chapterEndPercent = chapterStartPercent + chapterWidthPercent;
-      
-      const isActive = currentChapter?.index === index;
-      const centerX = chapterX + chapterW / 2;
-      const maxTextWidth = chapterW - 16;
-      
-      ctx.font = `${getFontWeight(isActive ? 'bold' : config.fontWeight)} ${config.fontSize}px Inter, -apple-system, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      const displayText = truncateText(ctx, chapter.name, maxTextWidth);
-      
-      if (chapterNamePosition === 'above') {
-        ctx.fillStyle = isActive ? chapter.color || config.textColor : hexToRgba(config.textColor, 0.5);
-        ctx.fillText(displayText, centerX, barY + 10);
-      } else if (chapterNamePosition === 'inside') {
-        const isFilled = progress >= chapterEndPercent;
-        ctx.fillStyle = isFilled ? '#ffffff' : hexToRgba(config.textColor, 0.7);
-        ctx.fillText(displayText, centerX, barYOffset + barHeight / 2);
-      } else {
-        ctx.fillStyle = isActive ? chapter.color || config.textColor : hexToRgba(config.textColor, 0.5);
-        ctx.fillText(displayText, centerX, barY + height - 5);
-      }
-
-      if (index < chapters.length - 1) {
-        ctx.beginPath();
-        ctx.arc(chapterX + chapterW, barYOffset + barHeight / 2, 3, 0, Math.PI * 2);
-        ctx.fillStyle = hexToRgba(config.textColor, 0.3);
-        ctx.fill();
-      }
-    });
-  }
+  // Chapter names are drawn separately after mascot
 }
 
 // Neon Style
@@ -462,9 +454,10 @@ function renderNeonStyle(
   config: ProgressBarConfig,
   progress: number,
   barY: number,
-  _hideDot: boolean = false
+  _hideDot: boolean = false,
+  _skipNames: boolean = false
 ) {
-  const { width, height, chapters, borderRadius, showChapterNames, chapterNamePosition, totalDuration } = config;
+  const { width, height, chapters, borderRadius, totalDuration } = config;
   
   ctx.fillStyle = '#0a0a12';
   roundRect(ctx, 0, barY, width, height, borderRadius);
@@ -474,8 +467,6 @@ function renderNeonStyle(
   ctx.lineWidth = 1;
   roundRect(ctx, 0, barY, width, height, borderRadius);
   ctx.stroke();
-
-  const currentChapter = getChapterAtProgress(chapters, progress, totalDuration);
 
   ctx.save();
   roundRect(ctx, 0, barY, width, height, borderRadius);
@@ -517,35 +508,7 @@ function renderNeonStyle(
       ctx.shadowBlur = 0;
     }
 
-    if (showChapterNames) {
-      const isActive = currentChapter?.index === index;
-      const centerX = chapterX + chapterW / 2;
-      const maxTextWidth = chapterW - 16;
-      
-      ctx.font = `${getFontWeight(isActive ? 'bold' : config.fontWeight)} ${config.fontSize}px Inter, -apple-system, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      const displayText = truncateText(ctx, chapter.name, maxTextWidth);
-      
-      if (isActive) {
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 15;
-      }
-      
-      if (chapterNamePosition === 'above') {
-        ctx.fillStyle = isActive ? color : hexToRgba(config.textColor, 0.4);
-        ctx.fillText(displayText, centerX, 14);
-      } else if (chapterNamePosition === 'inside') {
-        ctx.fillStyle = isActive ? '#ffffff' : hexToRgba('#ffffff', 0.5);
-        ctx.fillText(displayText, centerX, barY + height / 2);
-      } else {
-        ctx.fillStyle = isActive ? color : hexToRgba(config.textColor, 0.4);
-        ctx.fillText(displayText, centerX, barY + height + 20);
-      }
-      
-      ctx.shadowBlur = 0;
-    }
+    // Chapter names are drawn separately after mascot
 
     if (index < chapters.length - 1) {
       ctx.shadowColor = '#ffffff';
@@ -565,9 +528,10 @@ function renderGlassStyle(
   config: ProgressBarConfig,
   progress: number,
   barY: number,
-  _hideDot: boolean = false
+  _hideDot: boolean = false,
+  _skipNames: boolean = false
 ) {
-  const { width, height, chapters, borderRadius, showChapterNames, chapterNamePosition, totalDuration } = config;
+  const { width, height, chapters, borderRadius, totalDuration } = config;
   
   const glassGradient = ctx.createLinearGradient(0, barY, 0, barY + height);
   glassGradient.addColorStop(0, hexToRgba('#ffffff', 0.18));
@@ -583,8 +547,6 @@ function renderGlassStyle(
   ctx.lineWidth = 1;
   roundRect(ctx, 0, barY, width, height, borderRadius);
   ctx.stroke();
-
-  const currentChapter = getChapterAtProgress(chapters, progress, totalDuration);
 
   ctx.save();
   roundRect(ctx, 0, barY, width, height, borderRadius);
@@ -620,33 +582,7 @@ function renderGlassStyle(
       ctx.fillRect(chapterX, barY, fillWidth, height * 0.35);
     }
 
-    if (showChapterNames) {
-      const isActive = currentChapter?.index === index;
-      const centerX = chapterX + chapterW / 2;
-      const maxTextWidth = chapterW - 16;
-      
-      ctx.font = `${getFontWeight(isActive ? 'bold' : config.fontWeight)} ${config.fontSize}px Inter, -apple-system, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      const displayText = truncateText(ctx, chapter.name, maxTextWidth);
-      
-      if (chapterNamePosition === 'above') {
-        ctx.fillStyle = isActive ? config.textColor : hexToRgba(config.textColor, 0.6);
-        ctx.fillText(displayText, centerX, 14);
-      } else if (chapterNamePosition === 'inside') {
-        ctx.shadowColor = 'rgba(0,0,0,0.4)';
-        ctx.shadowBlur = 3;
-        ctx.shadowOffsetY = 1;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(displayText, centerX, barY + height / 2);
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetY = 0;
-      } else {
-        ctx.fillStyle = isActive ? config.textColor : hexToRgba(config.textColor, 0.6);
-        ctx.fillText(displayText, centerX, barY + height + 20);
-      }
-    }
+    // Chapter names are drawn separately after mascot
 
     if (index < chapters.length - 1) {
       const divX = chapterX + chapterW;
@@ -666,9 +602,10 @@ function renderGradientStyle(
   config: ProgressBarConfig,
   progress: number,
   barY: number,
-  hideDot: boolean = false
+  hideDot: boolean = false,
+  _skipNames: boolean = false
 ) {
-  const { width, height, chapters, borderRadius, backgroundColor, showChapterNames, chapterNamePosition, totalDuration } = config;
+  const { width, height, chapters, borderRadius, backgroundColor, totalDuration } = config;
   
   ctx.fillStyle = backgroundColor;
   roundRect(ctx, 0, barY, width, height, borderRadius);
@@ -706,41 +643,12 @@ function renderGradientStyle(
     ctx.fillRect(0, barY, progressX, height * 0.4);
   }
 
-  // Chapter names and dividers
-  chapters.forEach((chapter, index) => {
+  // Draw dividers only, chapter names are drawn separately after mascot
+  chapters.forEach((_chapter, index) => {
     const chapterStartPercent = getChapterStartPercent(chapters, index, totalDuration);
     const chapterWidthPercent = getChapterWidthPercent(chapters, index, totalDuration);
     const chapterX = chapterStartPercent * width;
     const chapterW = chapterWidthPercent * width;
-
-    if (showChapterNames) {
-      const isActive = currentChapter?.index === index;
-      const centerX = chapterX + chapterW / 2;
-      const maxTextWidth = chapterW - 20;
-      
-      ctx.font = `${getFontWeight(isActive ? 'bold' : config.fontWeight)} ${config.fontSize}px Inter, -apple-system, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      const displayText = truncateText(ctx, chapter.name, maxTextWidth);
-      
-      if (chapterNamePosition === 'above') {
-        ctx.fillStyle = isActive ? config.textColor : hexToRgba(config.textColor, 0.6);
-        ctx.fillText(displayText, centerX, 14);
-      } else if (chapterNamePosition === 'inside') {
-        const isFilled = centerX < progressX;
-        ctx.fillStyle = isFilled ? '#ffffff' : hexToRgba(config.textColor, 0.6);
-        if (isFilled) {
-          ctx.shadowColor = 'rgba(0,0,0,0.3)';
-          ctx.shadowBlur = 2;
-        }
-        ctx.fillText(displayText, centerX, barY + height / 2);
-        ctx.shadowBlur = 0;
-      } else {
-        ctx.fillStyle = isActive ? config.textColor : hexToRgba(config.textColor, 0.6);
-        ctx.fillText(displayText, centerX, barY + height + 20);
-      }
-    }
 
     if (index < chapters.length - 1) {
       const divX = chapterX + chapterW;
@@ -806,7 +714,7 @@ function renderMascot(
   barY: number,
   rawProgress: number
 ) {
-  const { width, height, mascot, showChapterNames, chapterNamePosition } = config;
+  const { width, height, mascot } = config;
   
   // Get emoji
   let emoji = '';
@@ -830,12 +738,8 @@ function renderMascot(
       break;
     case 'on-bar':
     default:
-      // If chapter names are inside the bar, position mascot at bottom edge of bar
-      if (showChapterNames && chapterNamePosition === 'inside') {
-        mascotY = barY + height - mascot.size / 3;
-      } else {
-        mascotY = barY + height / 2;
-      }
+      // Always center on the bar
+      mascotY = barY + height / 2;
       break;
   }
   
