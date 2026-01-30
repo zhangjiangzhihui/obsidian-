@@ -63,6 +63,9 @@ export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCan
           height += mascotSpace;
         } else if (config.mascot.position === 'below-bar') {
           height += mascotSpace;
+        } else if (config.mascot.position === 'on-bar' && config.showChapterNames && config.chapterNamePosition === 'inside') {
+          // When mascot is on-bar but names are inside, mascot moves below
+          height += mascotSpace;
         }
       }
       
@@ -805,7 +808,7 @@ function renderMascot(
   barY: number,
   rawProgress: number
 ) {
-  const { width, height, mascot } = config;
+  const { width, height, mascot, showChapterNames, chapterNamePosition } = config;
   
   // Get emoji
   let emoji = '';
@@ -829,7 +832,12 @@ function renderMascot(
       break;
     case 'on-bar':
     default:
-      mascotY = barY + height / 2;
+      // If chapter names are inside the bar, position mascot below the bar to avoid overlap
+      if (showChapterNames && chapterNamePosition === 'inside') {
+        mascotY = barY + height + mascot.size / 2 + 2;
+      } else {
+        mascotY = barY + height / 2;
+      }
       break;
   }
   
