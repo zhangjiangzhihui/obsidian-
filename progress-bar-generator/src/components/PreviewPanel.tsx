@@ -3,8 +3,7 @@ import type { ProgressBarConfig } from '../types';
 import { formatTimeString } from '../types';
 import ProgressBarCanvas from './ProgressBarCanvas';
 import type { ProgressBarCanvasRef } from './ProgressBarCanvas';
-import { Play, Pause, RotateCcw, Loader2, Image, Film, FileArchive } from 'lucide-react';
-import JSZip from 'jszip';
+import { Play, Pause, RotateCcw, Loader2, Film, Video } from 'lucide-react';
 import { saveAs } from 'file-saver';
 
 interface PreviewPanelProps {
@@ -24,7 +23,6 @@ function calculateCanvasHeight(config: ProgressBarConfig): number {
     if (config.mascot.position === 'above-bar' || config.mascot.position === 'below-bar') {
       height += mascotSpace;
     }
-    // on-bar: mascot stays on the bar, no extra height needed
   }
   
   return height;
@@ -35,7 +33,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
-  const [exportType, setExportType] = useState<'png' | 'gif' | null>(null);
+  const [exportType, setExportType] = useState<'gif' | 'video' | null>(null);
   
   const canvasRef = useRef<ProgressBarCanvasRef>(null);
   const animationRef = useRef<number | null>(null);
@@ -112,48 +110,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
 
   const currentChapter = getCurrentChapter();
 
-  // Export as PNG sequence
-  const exportPNGSequence = async () => {
-    setIsExporting(true);
-    setExportType('png');
-    setExportProgress(0);
-
-    const zip = new JSZip();
-    const totalFrames = config.totalDuration * config.fps;
-
-    try {
-      for (let frame = 0; frame <= totalFrames; frame++) {
-        const frameProgress = frame / totalFrames;
-        canvasRef.current?.renderFrame(frameProgress);
-
-        const canvas = canvasRef.current?.getCanvas();
-        if (canvas) {
-          const dataUrl = canvas.toDataURL('image/png');
-          const base64Data = dataUrl.split(',')[1];
-          const paddedFrame = String(frame).padStart(5, '0');
-          zip.file(`frame_${paddedFrame}.png`, base64Data, { base64: true });
-        }
-
-        setExportProgress((frame / totalFrames) * 100);
-        
-        if (frame % 10 === 0) {
-          await new Promise(resolve => setTimeout(resolve, 0));
-        }
-      }
-
-      const content = await zip.generateAsync({ type: 'blob' });
-      saveAs(content, `chapter-progress-bar-${Date.now()}.zip`);
-    } catch (error) {
-      console.error('Export failed:', error);
-      alert('导出失败，请重试');
-    } finally {
-      setIsExporting(false);
-      setExportType(null);
-      setExportProgress(0);
-      canvasRef.current?.renderFrame(progress);
-    }
-  };
-
   // Export as GIF
   const exportGIF = async () => {
     setIsExporting(true);
@@ -195,7 +151,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
       });
 
       gif.on('finished', (blob: Blob) => {
-        saveAs(blob, `chapter-progress-bar-${Date.now()}.gif`);
+        saveAs(blob, `progress-bar-${Date.now()}.gif`);
         setIsExporting(false);
         setExportType(null);
         setExportProgress(0);
@@ -205,22 +161,94 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
       gif.render();
     } catch (error) {
       console.error('GIF export failed:', error);
-      alert('GIF 导出失败，将导出为 PNG 序列');
+      alert('GIF 导出失败，请重试');
       setIsExporting(false);
       setExportType(null);
-      exportPNGSequence();
+      setExportProgress(0);
     }
   };
 
-  // Export single frame
-  const exportCurrentFrame = () => {
-    const canvas = canvasRef.current?.getCanvas();
-    if (canvas) {
-      canvas.toBlob((blob) => {
-        if (blob) {
-          saveAs(blob, `chapter-progress-${Math.round(progress * 100)}%-${Date.now()}.png`);
-        }
+  // Export as Video (WebM)
+  const exportVideo = async () => {
+    setIsExporting(true);
+    setExportType('video');
+    setExportProgress(0);
+
+    try {
+      const canvas = canvasRef.current?.getCanvas();
+      if (!canvas) {
+        throw new Error('Canvas not found');
+      }
+
+      // Create a temporary canvas for recording
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = config.width;
+      tempCanvas.height = calculateCanvasHeight(config);
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) {
+        throw new Error('Could not get canvas context');
+      }
+
+      // Check if MediaRecorder supports webm
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') 
+        ? 'video/webm;codecs=vp9'
+        : MediaRecorder.isTypeSupported('video/webm')
+        ? 'video/webm'
+        : 'video/mp4';
+
+      const stream = tempCanvas.captureStream(config.fps);
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: 5000000,
       });
+
+      const chunks: Blob[] = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: mimeType });
+        const extension = mimeType.includes('webm') ? 'webm' : 'mp4';
+        saveAs(blob, `progress-bar-${Date.now()}.${extension}`);
+        setIsExporting(false);
+        setExportType(null);
+        setExportProgress(0);
+        canvasRef.current?.renderFrame(progress);
+      };
+
+      mediaRecorder.start();
+
+      const totalFrames = config.totalDuration * config.fps;
+      const frameInterval = 1000 / config.fps;
+
+      for (let frame = 0; frame <= totalFrames; frame++) {
+        const frameProgress = frame / totalFrames;
+        canvasRef.current?.renderFrame(frameProgress);
+        
+        // Copy to temp canvas
+        const sourceCanvas = canvasRef.current?.getCanvas();
+        if (sourceCanvas) {
+          tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+          tempCtx.drawImage(sourceCanvas, 0, 0);
+        }
+
+        setExportProgress((frame / totalFrames) * 100);
+
+        // Wait for next frame
+        await new Promise(resolve => setTimeout(resolve, frameInterval));
+      }
+
+      mediaRecorder.stop();
+    } catch (error) {
+      console.error('Video export failed:', error);
+      alert('视频导出失败，请尝试 GIF 格式');
+      setIsExporting(false);
+      setExportType(null);
+      setExportProgress(0);
+      canvasRef.current?.renderFrame(progress);
     }
   };
 
@@ -327,14 +355,14 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
 
       {/* Export Section */}
       <div className="space-y-3">
-        <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider">导出选项</h4>
+        <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider">导出</h4>
         
         {isExporting && (
           <div className="bg-[#252525] rounded-xl p-4 mb-3">
             <div className="flex items-center gap-3 mb-2">
               <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
               <span className="text-sm">
-                正在导出 {exportType === 'gif' ? 'GIF' : 'PNG 序列'}...
+                正在导出 {exportType === 'gif' ? 'GIF 动画' : '视频'}...
               </span>
             </div>
             <div className="w-full bg-[#1a1a1a] rounded-full h-2">
@@ -349,38 +377,27 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-3">
-          <button
-            onClick={exportCurrentFrame}
-            disabled={isExporting}
-            className="flex flex-col items-center gap-2 p-4 rounded-xl bg-[#252525] hover:bg-[#2a2a2a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Image className="w-6 h-6 text-indigo-400" />
-            <span className="text-xs">当前帧</span>
-          </button>
-          
-          <button
-            onClick={exportPNGSequence}
-            disabled={isExporting}
-            className="flex flex-col items-center gap-2 p-4 rounded-xl bg-[#252525] hover:bg-[#2a2a2a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <FileArchive className="w-6 h-6 text-indigo-400" />
-            <span className="text-xs">PNG 序列</span>
-          </button>
-          
+        <div className="grid grid-cols-2 gap-3">
           <button
             onClick={exportGIF}
             disabled={isExporting}
             className="flex flex-col items-center gap-2 p-4 rounded-xl bg-[#252525] hover:bg-[#2a2a2a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Film className="w-6 h-6 text-indigo-400" />
-            <span className="text-xs">GIF 动画</span>
+            <span className="text-sm font-medium">GIF 动画</span>
+            <span className="text-xs text-gray-500">适合分享预览</span>
+          </button>
+          
+          <button
+            onClick={exportVideo}
+            disabled={isExporting}
+            className="flex flex-col items-center gap-2 p-4 rounded-xl bg-[#252525] hover:bg-[#2a2a2a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Video className="w-6 h-6 text-indigo-400" />
+            <span className="text-sm font-medium">视频</span>
+            <span className="text-xs text-gray-500">适合视频编辑</span>
           </button>
         </div>
-
-        <p className="text-xs text-gray-500 text-center mt-2">
-          PNG 序列适合 Premiere/After Effects/达芬奇，GIF 适合快速预览
-        </p>
       </div>
     </div>
   );
