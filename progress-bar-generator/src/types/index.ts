@@ -54,7 +54,7 @@ export const DEFAULT_CHAPTERS: Chapter[] = [
 export const DEFAULT_CONFIG: ProgressBarConfig = {
   style: 'modern',
   width: 1000,
-  height: 80,
+  height: 60,
   totalDuration: 60,
   fps: 30,
   
@@ -66,7 +66,7 @@ export const DEFAULT_CONFIG: ProgressBarConfig = {
   chapters: DEFAULT_CHAPTERS,
   showChapterNames: true,
   showChapterDividers: true,
-  chapterNamePosition: 'above',
+  chapterNamePosition: 'inside',
   
   borderRadius: 12,
   glowEffect: true,
