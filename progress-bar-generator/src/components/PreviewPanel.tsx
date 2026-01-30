@@ -247,37 +247,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
           />
         </div>
 
-        {/* Chapter visualization */}
-        <div className="mt-6 flex items-center gap-1 flex-wrap justify-center">
-          {config.chapters.map((chapter, index) => {
-            let accumulated = 0;
-            for (let i = 0; i <= index; i++) {
-              accumulated += config.chapters[i].duration / 100;
-            }
-            const isActive = progress >= (accumulated - chapter.duration / 100) && progress < accumulated;
-            const isPast = progress >= accumulated;
-            
-            return (
-              <div
-                key={chapter.id}
-                className={`px-3 py-1 rounded-full text-xs transition-all ${
-                  isActive 
-                    ? 'scale-110 font-medium' 
-                    : isPast 
-                    ? 'opacity-60' 
-                    : 'opacity-40'
-                }`}
-                style={{
-                  backgroundColor: isActive ? chapter.color : 'transparent',
-                  border: `2px solid ${chapter.color}`,
-                  color: isActive ? '#fff' : chapter.color,
-                }}
-              >
-                {chapter.name}
-              </div>
-            );
-          })}
-        </div>
       </div>
 
       {/* Progress Scrubber */}
