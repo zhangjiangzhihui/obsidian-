@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ProgressBarConfig, Chapter } from '../types';
-import { STYLE_OPTIONS, PRESET_COLOR_SCHEMES, formatTimeString, parseTimeString, getChapterDuration } from '../types';
-import { Settings, Palette, Layout, Sparkles, List, Plus, Trash2, Clock } from 'lucide-react';
+import { STYLE_OPTIONS, PRESET_COLOR_SCHEMES, MASCOT_OPTIONS, formatTimeString, parseTimeString, getChapterDuration } from '../types';
+import { Settings, Palette, Layout, Sparkles, List, Plus, Trash2, Clock, Cat } from 'lucide-react';
 
 interface SettingsPanelProps {
   config: ProgressBarConfig;
@@ -373,6 +373,95 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onChange }) => {
             checked={config.showTimeCode}
             onChange={(v) => updateConfig('showTimeCode', v)}
           />
+        </div>
+      </section>
+
+      {/* Mascot Settings */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <Cat className="w-5 h-5 text-indigo-400" />
+          <h3 className="text-lg font-semibold">萌宠设置</h3>
+        </div>
+        
+        {/* Mascot Type Selection */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-5 gap-2">
+            {MASCOT_OPTIONS.map((option) => (
+              <button
+                key={option.type}
+                onClick={() => updateConfig('mascot', { ...config.mascot, type: option.type })}
+                className={`flex flex-col items-center p-2 rounded-xl transition-all ${
+                  config.mascot.type === option.type
+                    ? 'bg-indigo-500/20 border-2 border-indigo-500'
+                    : 'bg-[#252525] border-2 border-transparent hover:bg-[#2a2a2a]'
+                }`}
+                title={option.label}
+              >
+                <span className="text-xl">{option.emoji}</span>
+                <span className="text-[10px] text-gray-400 mt-1">{option.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Custom Emoji Input */}
+          {config.mascot.type === 'custom' && (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-300">自定义</span>
+              <input
+                type="text"
+                value={config.mascot.customEmoji}
+                onChange={(e) => updateConfig('mascot', { ...config.mascot, customEmoji: e.target.value })}
+                className="w-20 bg-[#252525] border border-gray-700 rounded-lg px-3 py-2 text-center text-xl focus:outline-none focus:border-indigo-500"
+                placeholder="😀"
+              />
+            </div>
+          )}
+
+          {config.mascot.type !== 'none' && (
+            <>
+              {/* Mascot Position */}
+              <div className="space-y-2">
+                <label className="text-sm text-gray-300">位置</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['above-bar', 'on-bar', 'below-bar'] as const).map((pos) => (
+                    <button
+                      key={pos}
+                      onClick={() => updateConfig('mascot', { ...config.mascot, position: pos })}
+                      className={`px-3 py-2 rounded-lg text-xs transition-colors ${
+                        config.mascot.position === pos
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-[#252525] text-gray-400 hover:bg-[#2a2a2a]'
+                      }`}
+                    >
+                      {pos === 'above-bar' ? '上方' : pos === 'on-bar' ? '进度条上' : '下方'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mascot Size */}
+              <Slider
+                label="大小"
+                value={config.mascot.size}
+                min={20}
+                max={60}
+                unit="px"
+                onChange={(v) => updateConfig('mascot', { ...config.mascot, size: v })}
+              />
+
+              {/* Mascot Effects */}
+              <Toggle
+                label="弹跳效果"
+                checked={config.mascot.bounce}
+                onChange={(v) => updateConfig('mascot', { ...config.mascot, bounce: v })}
+              />
+              <Toggle
+                label="拖尾效果"
+                checked={config.mascot.trail}
+                onChange={(v) => updateConfig('mascot', { ...config.mascot, trail: v })}
+              />
+            </>
+          )}
         </div>
       </section>
 

@@ -1,5 +1,6 @@
 import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import type { ProgressBarConfig, Chapter } from '../types';
+import { MASCOT_OPTIONS } from '../types';
 
 interface ProgressBarCanvasProps {
   config: ProgressBarConfig;
@@ -46,17 +47,42 @@ export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCan
   ({ config, progress }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    // Calculate canvas height based on chapter name position
+    // Calculate canvas height based on chapter name position and mascot
     const getCanvasHeight = () => {
-      if (!config.showChapterNames) return config.height;
-      if (config.chapterNamePosition === 'inside') return config.height;
-      return config.height + 35;
+      let height = config.height;
+      
+      // Add space for chapter names
+      if (config.showChapterNames && config.chapterNamePosition !== 'inside') {
+        height += 35;
+      }
+      
+      // Add space for mascot
+      if (config.mascot.type !== 'none') {
+        const mascotSpace = config.mascot.size + 10;
+        if (config.mascot.position === 'above-bar') {
+          height += mascotSpace;
+        } else if (config.mascot.position === 'below-bar') {
+          height += mascotSpace;
+        }
+      }
+      
+      return height;
     };
 
     const getBarY = () => {
-      if (!config.showChapterNames) return 0;
-      if (config.chapterNamePosition === 'above') return 35;
-      return 0;
+      let y = 0;
+      
+      // Offset for chapter names above
+      if (config.showChapterNames && config.chapterNamePosition === 'above') {
+        y += 35;
+      }
+      
+      // Offset for mascot above
+      if (config.mascot.type !== 'none' && config.mascot.position === 'above-bar') {
+        y += config.mascot.size + 10;
+      }
+      
+      return y;
     };
 
     const renderFrame = (currentProgress: number) => {
@@ -94,6 +120,11 @@ export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCan
         case 'gradient':
           renderGradientStyle(ctx, config, easedProgress, barY);
           break;
+      }
+      
+      // Render mascot
+      if (config.mascot.type !== 'none') {
+        renderMascot(ctx, config, easedProgress, barY, currentProgress);
       }
     };
 
@@ -753,6 +784,85 @@ function lightenColor(hex: string, percent: number): string {
   const newB = Math.min(255, b + (255 - b) * (percent / 100));
   
   return `#${Math.round(newR).toString(16).padStart(2, '0')}${Math.round(newG).toString(16).padStart(2, '0')}${Math.round(newB).toString(16).padStart(2, '0')}`;
+}
+
+// Render mascot
+function renderMascot(
+  ctx: CanvasRenderingContext2D,
+  config: ProgressBarConfig,
+  progress: number,
+  barY: number,
+  rawProgress: number
+) {
+  const { width, height, mascot } = config;
+  
+  // Get emoji
+  let emoji = '';
+  if (mascot.type === 'custom') {
+    emoji = mascot.customEmoji;
+  } else {
+    const mascotOption = MASCOT_OPTIONS.find(m => m.type === mascot.type);
+    emoji = mascotOption?.emoji || '🐱';
+  }
+  
+  // Calculate position
+  const progressX = Math.max(mascot.size / 2, Math.min(progress * width, width - mascot.size / 2));
+  
+  let mascotY: number;
+  switch (mascot.position) {
+    case 'above-bar':
+      mascotY = barY - mascot.size / 2 - 5;
+      break;
+    case 'below-bar':
+      mascotY = barY + height + mascot.size / 2 + 5;
+      break;
+    case 'on-bar':
+    default:
+      mascotY = barY + height / 2;
+      break;
+  }
+  
+  // Bounce effect
+  let bounceOffset = 0;
+  if (mascot.bounce) {
+    bounceOffset = Math.sin(rawProgress * Math.PI * 20) * 5;
+  }
+  
+  // Draw trail
+  if (mascot.trail && progress > 0.05) {
+    const trailCount = 5;
+    for (let i = trailCount; i > 0; i--) {
+      const trailProgress = Math.max(0, progress - i * 0.02);
+      const trailX = trailProgress * width;
+      const trailAlpha = (1 - i / trailCount) * 0.3;
+      const trailSize = mascot.size * (1 - i / trailCount * 0.3);
+      
+      ctx.save();
+      ctx.globalAlpha = trailAlpha;
+      ctx.font = `${trailSize}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(emoji, trailX, mascotY);
+      ctx.restore();
+    }
+  }
+  
+  // Draw mascot shadow
+  ctx.save();
+  ctx.globalAlpha = 0.3;
+  ctx.font = `${mascot.size}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(emoji, progressX + 2, mascotY + bounceOffset + 2);
+  ctx.restore();
+  
+  // Draw mascot
+  ctx.save();
+  ctx.font = `${mascot.size}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(emoji, progressX, mascotY + bounceOffset);
+  ctx.restore();
 }
 
 export default ProgressBarCanvas;

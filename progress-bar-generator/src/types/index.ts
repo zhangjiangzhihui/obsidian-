@@ -7,6 +7,17 @@ export interface Chapter {
   color?: string;
 }
 
+export type MascotType = 'none' | 'cat' | 'dog' | 'rabbit' | 'bear' | 'panda' | 'fox' | 'penguin' | 'chicken' | 'rocket' | 'star' | 'heart' | 'fire' | 'custom';
+
+export interface MascotConfig {
+  type: MascotType;
+  customEmoji: string;
+  size: number;
+  position: 'on-bar' | 'above-bar' | 'below-bar';
+  bounce: boolean;
+  trail: boolean;
+}
+
 export interface ProgressBarConfig {
   style: ProgressBarStyle;
   width: number;
@@ -41,6 +52,9 @@ export interface ProgressBarConfig {
   // Typography
   fontSize: number;
   fontWeight: 'normal' | 'medium' | 'bold';
+  
+  // Mascot
+  mascot: MascotConfig;
 }
 
 // Default chapters with timestamps
@@ -51,6 +65,32 @@ export const DEFAULT_CHAPTERS: Chapter[] = [
   { id: '4', name: '总结', startTime: 100, color: '#d946ef' },
   { id: '5', name: '结尾', startTime: 130, color: '#ec4899' },
 ];
+
+export const MASCOT_OPTIONS: { type: MascotType; emoji: string; label: string }[] = [
+  { type: 'none', emoji: '⊘', label: '无' },
+  { type: 'cat', emoji: '🐱', label: '猫咪' },
+  { type: 'dog', emoji: '🐶', label: '狗狗' },
+  { type: 'rabbit', emoji: '🐰', label: '兔子' },
+  { type: 'bear', emoji: '🐻', label: '小熊' },
+  { type: 'panda', emoji: '🐼', label: '熊猫' },
+  { type: 'fox', emoji: '🦊', label: '狐狸' },
+  { type: 'penguin', emoji: '🐧', label: '企鹅' },
+  { type: 'chicken', emoji: '🐤', label: '小鸡' },
+  { type: 'rocket', emoji: '🚀', label: '火箭' },
+  { type: 'star', emoji: '⭐', label: '星星' },
+  { type: 'heart', emoji: '❤️', label: '爱心' },
+  { type: 'fire', emoji: '🔥', label: '火焰' },
+  { type: 'custom', emoji: '✏️', label: '自定义' },
+];
+
+export const DEFAULT_MASCOT: MascotConfig = {
+  type: 'cat',
+  customEmoji: '😀',
+  size: 32,
+  position: 'on-bar',
+  bounce: true,
+  trail: false,
+};
 
 export const DEFAULT_CONFIG: ProgressBarConfig = {
   style: 'modern',
@@ -80,6 +120,8 @@ export const DEFAULT_CONFIG: ProgressBarConfig = {
   
   fontSize: 14,
   fontWeight: 'medium',
+  
+  mascot: DEFAULT_MASCOT,
 };
 
 export const STYLE_OPTIONS: { value: ProgressBarStyle; label: string; description: string }[] = [

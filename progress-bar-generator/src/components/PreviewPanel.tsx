@@ -11,6 +11,24 @@ interface PreviewPanelProps {
   config: ProgressBarConfig;
 }
 
+// Helper to calculate canvas height
+function calculateCanvasHeight(config: ProgressBarConfig): number {
+  let height = config.height;
+  
+  if (config.showChapterNames && config.chapterNamePosition !== 'inside') {
+    height += 35;
+  }
+  
+  if (config.mascot.type !== 'none') {
+    const mascotSpace = config.mascot.size + 10;
+    if (config.mascot.position === 'above-bar' || config.mascot.position === 'below-bar') {
+      height += mascotSpace;
+    }
+  }
+  
+  return height;
+}
+
 const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
   const [progress, setProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -148,7 +166,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
         workers: 2,
         quality: 10,
         width: config.width,
-        height: config.showChapterNames && config.chapterNamePosition !== 'inside' ? config.height + 35 : config.height,
+        height: calculateCanvasHeight(config),
         workerScript: '/obsidian-/gif.worker.js',
       });
 
