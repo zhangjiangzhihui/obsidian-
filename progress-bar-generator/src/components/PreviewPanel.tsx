@@ -23,10 +23,8 @@ function calculateCanvasHeight(config: ProgressBarConfig): number {
     const mascotSpace = config.mascot.size + 10;
     if (config.mascot.position === 'above-bar' || config.mascot.position === 'below-bar') {
       height += mascotSpace;
-    } else if (config.mascot.position === 'on-bar' && config.showChapterNames && config.chapterNamePosition === 'inside') {
-      // When mascot is on-bar but names are inside, mascot moves below
-      height += mascotSpace;
     }
+    // on-bar: mascot stays on the bar, no extra height needed
   }
   
   return height;

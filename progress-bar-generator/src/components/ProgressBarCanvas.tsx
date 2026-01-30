@@ -56,17 +56,15 @@ export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCan
         height += 35;
       }
       
-      // Add space for mascot
+      // Add space for mascot above or below bar
       if (config.mascot.type !== 'none') {
         const mascotSpace = config.mascot.size + 10;
         if (config.mascot.position === 'above-bar') {
           height += mascotSpace;
         } else if (config.mascot.position === 'below-bar') {
           height += mascotSpace;
-        } else if (config.mascot.position === 'on-bar' && config.showChapterNames && config.chapterNamePosition === 'inside') {
-          // When mascot is on-bar but names are inside, mascot moves below
-          height += mascotSpace;
         }
+        // on-bar: mascot stays on the bar, no extra height needed
       }
       
       return height;
@@ -832,9 +830,9 @@ function renderMascot(
       break;
     case 'on-bar':
     default:
-      // If chapter names are inside the bar, position mascot below the bar to avoid overlap
+      // If chapter names are inside the bar, position mascot at bottom edge of bar
       if (showChapterNames && chapterNamePosition === 'inside') {
-        mascotY = barY + height + mascot.size / 2 + 2;
+        mascotY = barY + height - mascot.size / 3;
       } else {
         mascotY = barY + height / 2;
       }
