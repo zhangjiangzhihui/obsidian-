@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ProgressBarConfig, Chapter } from '../types';
-import { STYLE_OPTIONS, PRESET_COLOR_SCHEMES, MASCOT_OPTIONS, formatTimeString, parseTimeString, getChapterDuration } from '../types';
+import { STYLE_OPTIONS, MASCOT_OPTIONS, formatTimeString, parseTimeString, getChapterDuration } from '../types';
 import { Settings, Palette, Layout, Sparkles, List, Plus, Trash2, Clock, Cat } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -165,14 +165,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onChange }) => {
     updateConfig('chapters', config.chapters.filter(ch => ch.id !== id));
   };
 
-  const applyColorScheme = (colors: string[]) => {
-    const newChapters = config.chapters.map((ch, i) => ({
-      ...ch,
-      color: colors[i % colors.length],
-    }));
-    updateConfig('chapters', newChapters);
-  };
-
   // Handle total duration change
   const handleTotalDurationChange = (newDuration: number) => {
     // Adjust chapters that exceed the new duration
@@ -307,28 +299,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onChange }) => {
           })}
         </div>
 
-        {/* Color Schemes */}
-        <div className="mt-4">
-          <span className="text-xs text-gray-400 mb-2 block">快速配色</span>
-          <div className="flex flex-wrap gap-2">
-            {PRESET_COLOR_SCHEMES.map((scheme) => (
-              <button
-                key={scheme.name}
-                onClick={() => applyColorScheme(scheme.colors)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#252525] hover:bg-[#2a2a2a] transition-colors"
-                title={scheme.name}
-              >
-                {scheme.colors.slice(0, 4).map((color, i) => (
-                  <div
-                    key={i}
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              </button>
-            ))}
-          </div>
-        </div>
       </section>
 
       {/* Display Settings */}
