@@ -74,6 +74,19 @@ export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCan
       return y;
     };
 
+    // Calculate actual bar position for a given style
+    const getActualBarPosition = (barY: number): { actualBarY: number; actualBarHeight: number } => {
+      const { height, style, chapterNamePosition } = config;
+      
+      if (style === 'minimal' && chapterNamePosition !== 'inside') {
+        const barHeight = height * 0.4;
+        const barYOffset = barY + (height - barHeight) / 2;
+        return { actualBarY: barYOffset, actualBarHeight: barHeight };
+      }
+      
+      return { actualBarY: barY, actualBarHeight: height };
+    };
+
     const renderFrame = (currentProgress: number) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -84,6 +97,7 @@ export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCan
       const easedProgress = easingFunctions[config.animationEasing](currentProgress);
       const canvasHeight = getCanvasHeight();
       const barY = getBarY();
+      const { actualBarY, actualBarHeight } = getActualBarPosition(barY);
 
       canvas.width = config.width;
       canvas.height = canvasHeight;
@@ -111,11 +125,11 @@ export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCan
       }
       
       if (config.mascot.type !== 'none') {
-        renderMascot(ctx, config, easedProgress, barY);
+        renderMascot(ctx, config, easedProgress, actualBarY, actualBarHeight);
       }
       
       if (config.showChapterNames) {
-        renderChapterNames(ctx, config, easedProgress, barY);
+        renderChapterNames(ctx, config, easedProgress, actualBarY, actualBarHeight);
       }
     };
 
@@ -218,8 +232,8 @@ function darkenColor(hex: string, percent: number): string {
 }
 
 // Render chapter names
-function renderChapterNames(ctx: CanvasRenderingContext2D, config: ProgressBarConfig, progress: number, barY: number) {
-  const { width, height, chapters, chapterNamePosition, totalDuration } = config;
+function renderChapterNames(ctx: CanvasRenderingContext2D, config: ProgressBarConfig, progress: number, actualBarY: number, actualBarHeight: number) {
+  const { width, chapters, chapterNamePosition, totalDuration } = config;
   const currentChapter = getChapterAtProgress(chapters, progress, totalDuration);
 
   chapters.forEach((chapter, index) => {
@@ -282,9 +296,9 @@ function renderChapterNames(ctx: CanvasRenderingContext2D, config: ProgressBarCo
       // 内部显示 - 更有质感的标签
       const textMetrics = ctx.measureText(displayText);
       const pillWidth = Math.min(textMetrics.width + 24, chapterW - 8);
-      const pillHeight = Math.min(config.fontSize + 14, height - 8);
+      const pillHeight = Math.min(config.fontSize + 14, actualBarHeight - 8);
       const pillX = centerX - pillWidth / 2;
-      const pillY = barY + (height - pillHeight) / 2;
+      const pillY = actualBarY + (actualBarHeight - pillHeight) / 2;
 
       const isFilled = fillRatio > 0.5;
       
@@ -305,11 +319,11 @@ function renderChapterNames(ctx: CanvasRenderingContext2D, config: ProgressBarCo
 
       // 文字
       ctx.fillStyle = isFilled ? '#ffffff' : hexToRgba(config.textColor, 0.85);
-      ctx.fillText(displayText, centerX, barY + height / 2);
+      ctx.fillText(displayText, centerX, actualBarY + actualBarHeight / 2);
     } else {
-      // 下方显示
+      // 下方显示 - 使用原始高度区域的底部
       ctx.fillStyle = isActive ? config.textColor : hexToRgba(config.textColor, 0.5);
-      ctx.fillText(displayText, centerX, barY + height + 24);
+      ctx.fillText(displayText, centerX, actualBarY + actualBarHeight + 24);
     }
   });
 }
@@ -680,8 +694,8 @@ function renderGradientStyle(ctx: CanvasRenderingContext2D, config: ProgressBarC
 }
 
 // Render mascot
-function renderMascot(ctx: CanvasRenderingContext2D, config: ProgressBarConfig, progress: number, barY: number) {
-  const { width, height, mascot } = config;
+function renderMascot(ctx: CanvasRenderingContext2D, config: ProgressBarConfig, progress: number, actualBarY: number, actualBarHeight: number) {
+  const { width, mascot } = config;
   
   let emoji = '';
   if (mascot.type === 'custom') {
@@ -696,14 +710,14 @@ function renderMascot(ctx: CanvasRenderingContext2D, config: ProgressBarConfig, 
   let mascotY: number;
   switch (mascot.position) {
     case 'above-bar':
-      mascotY = barY - mascot.size / 2 - 5;
+      mascotY = actualBarY - mascot.size / 2 - 5;
       break;
     case 'below-bar':
-      mascotY = barY + height + mascot.size / 2 + 5;
+      mascotY = actualBarY + actualBarHeight + mascot.size / 2 + 5;
       break;
     case 'on-bar':
     default:
-      mascotY = barY + height / 2;
+      mascotY = actualBarY + actualBarHeight / 2;
       break;
   }
   
