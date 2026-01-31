@@ -282,32 +282,44 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
           </div>
         </div>
 
+        {/* Scrollable container for wide progress bars */}
         <div 
-          className="relative"
+          className="w-full overflow-x-auto pb-3"
           style={{
-            maxWidth: '100%',
-            maxHeight: '100%',
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#4f46e5 #1a1a1a',
           }}
         >
           <div 
-            className="absolute inset-0 rounded-lg opacity-20"
+            className="relative inline-block min-w-full"
             style={{
-              backgroundImage: `
-                linear-gradient(45deg, #333 25%, transparent 25%),
-                linear-gradient(-45deg, #333 25%, transparent 25%),
-                linear-gradient(45deg, transparent 75%, #333 75%),
-                linear-gradient(-45deg, transparent 75%, #333 75%)
-              `,
-              backgroundSize: '20px 20px',
-              backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+              width: config.width > 600 ? config.width : '100%',
             }}
-          />
-          <ProgressBarCanvas 
-            ref={canvasRef}
-            config={config} 
-            progress={progress}
-          />
+          >
+            <div 
+              className="absolute inset-0 rounded-lg opacity-20"
+              style={{
+                backgroundImage: `
+                  linear-gradient(45deg, #333 25%, transparent 25%),
+                  linear-gradient(-45deg, #333 25%, transparent 25%),
+                  linear-gradient(45deg, transparent 75%, #333 75%),
+                  linear-gradient(-45deg, transparent 75%, #333 75%)
+                `,
+                backgroundSize: '20px 20px',
+                backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+              }}
+            />
+            <ProgressBarCanvas 
+              ref={canvasRef}
+              config={config} 
+              progress={progress}
+            />
+          </div>
         </div>
+        
+        {config.width > 600 && (
+          <p className="text-xs text-gray-500 mt-2 text-center">← 左右滑动查看完整进度条 →</p>
+        )}
       </div>
 
       {/* Progress Scrubber */}
