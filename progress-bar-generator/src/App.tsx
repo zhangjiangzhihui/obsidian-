@@ -95,27 +95,64 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f0f0f] text-white">
+    <div 
+      className="min-h-screen text-white"
+      style={{
+        background: 'linear-gradient(145deg, #0a0a0c 0%, #0f0f12 50%, #0a0a0c 100%)',
+      }}
+    >
       {/* Header */}
-      <header className="border-b border-gray-800 bg-[#0f0f0f]/80 backdrop-blur-lg sticky top-0 z-50">
+      <header 
+        className="sticky top-0 z-50"
+        style={{
+          background: 'linear-gradient(180deg, rgba(10,10,12,0.98) 0%, rgba(10,10,12,0.95) 100%)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255,255,255,0.03)',
+        }}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+            <div className="flex items-center gap-4">
+              <div 
+                className="w-11 h-11 rounded-xl flex items-center justify-center relative"
+                style={{
+                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  boxShadow: '0 4px 20px rgba(99, 102, 241, 0.3)',
+                }}
+              >
                 <Sparkles className="w-5 h-5" />
+                <div 
+                  className="absolute inset-0 rounded-xl"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%)',
+                  }}
+                />
               </div>
               <div>
-                <h1 className="text-lg font-bold">章节进度条生成器</h1>
-                <p className="text-xs text-gray-400 hidden sm:block">使用时间戳定义章节，导出视频进度条素材</p>
+                <h1 
+                  className="text-lg font-bold tracking-tight"
+                  style={{
+                    background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                  }}
+                >
+                  章节进度条生成器
+                </h1>
+                <p className="text-xs text-gray-500 hidden sm:block">创建精美的视频章节进度条</p>
               </div>
             </div>
             
             {/* Mobile menu button */}
             <button
               onClick={() => setShowMobileMenu(!showMobileMenu)}
-              className="lg:hidden p-2 rounded-lg hover:bg-gray-800 transition-colors"
+              className="lg:hidden p-2.5 rounded-xl transition-all duration-200"
+              style={{
+                background: 'linear-gradient(145deg, #1a1a1e 0%, #161619 100%)',
+                border: '1px solid rgba(255,255,255,0.05)',
+              }}
             >
-              {showMobileMenu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
@@ -123,7 +160,13 @@ function App() {
 
       {/* Mobile Menu */}
       {showMobileMenu && (
-        <div className="lg:hidden fixed inset-0 z-40 bg-[#0f0f0f]" style={{ top: '64px' }}>
+        <div 
+          className="lg:hidden fixed inset-0 z-40" 
+          style={{ 
+            top: '64px',
+            background: 'linear-gradient(145deg, #0a0a0c 0%, #0f0f12 100%)',
+          }}
+        >
           <div className="p-4 h-full overflow-y-auto">
             <SettingsPanel config={config} onChange={setConfig} />
           </div>
@@ -139,24 +182,54 @@ function App() {
           </aside>
 
           {/* Preview Panel */}
-          <section className="lg:col-span-8 xl:col-span-9 bg-[#1a1a1a] rounded-2xl p-6">
+          <section 
+            className="lg:col-span-8 xl:col-span-9 rounded-2xl p-6"
+            style={{
+              background: 'linear-gradient(145deg, #141418 0%, #111114 100%)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03), 0 0 0 1px rgba(255,255,255,0.02)',
+            }}
+          >
             <PreviewPanel config={config} />
           </section>
         </div>
       </main>
 
       {/* Presets Quick Access */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 hidden sm:flex items-center gap-2 bg-[#1a1a1a] rounded-full px-4 py-2 shadow-xl border border-gray-800">
-        <span className="text-xs text-gray-400 mr-2">场景预设:</span>
-        {PRESETS.map((preset) => (
-          <button
-            key={preset.name}
-            onClick={() => applyPreset(preset)}
-            className="px-3 py-1 rounded-full text-xs bg-[#252525] hover:bg-[#2a2a2a] transition-colors whitespace-nowrap"
-          >
-            {preset.name}
-          </button>
-        ))}
+      <div 
+        className="fixed bottom-6 left-1/2 -translate-x-1/2 hidden sm:flex items-center gap-3 rounded-2xl px-5 py-3"
+        style={{
+          background: 'linear-gradient(145deg, rgba(20,20,24,0.95) 0%, rgba(17,17,20,0.95) 100%)',
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.05)',
+        }}
+      >
+        <span className="text-xs text-gray-500 font-medium">场景预设</span>
+        <div className="w-px h-4 bg-gray-700" />
+        <div className="flex items-center gap-2">
+          {PRESETS.map((preset) => (
+            <button
+              key={preset.name}
+              onClick={() => applyPreset(preset)}
+              className="px-4 py-2 rounded-xl text-xs font-medium transition-all duration-200"
+              style={{
+                background: 'linear-gradient(145deg, #1f1f25 0%, #1a1a1e 100%)',
+                border: '1px solid rgba(255,255,255,0.03)',
+                color: '#9ca3af',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(145deg, #2a2a32 0%, #252530 100%)';
+                e.currentTarget.style.color = '#ffffff';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(145deg, #1f1f25 0%, #1a1a1e 100%)';
+                e.currentTarget.style.color = '#9ca3af';
+              }}
+            >
+              {preset.name}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

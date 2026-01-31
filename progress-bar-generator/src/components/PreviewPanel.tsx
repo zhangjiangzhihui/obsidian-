@@ -255,28 +255,59 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
   return (
     <div className="flex flex-col h-full">
       {/* Preview Area */}
-      <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#0a0a0a] rounded-2xl mb-4 min-h-[250px]">
+      <div 
+        className="flex-1 flex flex-col items-center justify-center p-8 rounded-2xl mb-6 min-h-[280px] relative overflow-hidden"
+        style={{
+          background: 'linear-gradient(145deg, #0d0d10 0%, #131318 50%, #0a0a0d 100%)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03), 0 0 0 1px rgba(255,255,255,0.03)',
+        }}
+      >
+        {/* Subtle grid pattern overlay */}
+        <div 
+          className="absolute inset-0 opacity-[0.015]"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
+            `,
+            backgroundSize: '20px 20px',
+          }}
+        />
+        
         {/* Current info */}
-        <div className="mb-6 text-center">
-          <div className="flex items-center justify-center gap-4 mb-2">
-            <span className="text-2xl font-mono text-indigo-400">
+        <div className="mb-8 text-center relative z-10">
+          <div className="flex items-center justify-center gap-4 mb-3">
+            <span 
+              className="text-3xl font-mono tracking-tight"
+              style={{
+                background: 'linear-gradient(135deg, #818cf8 0%, #a78bfa 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                textShadow: '0 0 30px rgba(129, 140, 248, 0.3)',
+              }}
+            >
               {formatTimeString(progress * config.totalDuration)}
             </span>
-            <span className="text-gray-500">/</span>
-            <span className="text-lg font-mono text-gray-400">
+            <span className="text-gray-600 text-xl">/</span>
+            <span className="text-xl font-mono text-gray-500 tracking-tight">
               {formatTimeString(config.totalDuration)}
             </span>
           </div>
           <div 
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm"
+            className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full text-sm font-medium backdrop-blur-sm"
             style={{ 
-              backgroundColor: currentChapter?.color + '20',
-              color: currentChapter?.color 
+              background: `linear-gradient(135deg, ${currentChapter?.color}15 0%, ${currentChapter?.color}08 100%)`,
+              border: `1px solid ${currentChapter?.color}30`,
+              color: currentChapter?.color,
+              boxShadow: `0 0 20px ${currentChapter?.color}10`,
             }}
           >
             <div 
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: currentChapter?.color }}
+              className="w-2 h-2 rounded-full animate-pulse"
+              style={{ 
+                backgroundColor: currentChapter?.color,
+                boxShadow: `0 0 8px ${currentChapter?.color}`,
+              }}
             />
             {currentChapter?.name}
           </div>
@@ -284,10 +315,10 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
 
         {/* Scrollable container for wide progress bars */}
         <div 
-          className="w-full overflow-x-auto pb-3"
+          className="w-full overflow-x-auto pb-4 relative z-10"
           style={{
             scrollbarWidth: 'thin',
-            scrollbarColor: '#4f46e5 #1a1a1a',
+            scrollbarColor: '#4f46e5 transparent',
           }}
         >
           <div 
@@ -305,96 +336,189 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ config }) => {
         </div>
         
         {config.width > 600 && (
-          <p className="text-xs text-gray-500 mt-2 text-center">← 左右滑动查看完整进度条 →</p>
+          <p className="text-xs text-gray-600 mt-3 text-center flex items-center gap-2 relative z-10">
+            <span className="text-gray-500">←</span>
+            左右滑动查看完整进度条
+            <span className="text-gray-500">→</span>
+          </p>
         )}
       </div>
 
       {/* Progress Scrubber */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between text-sm text-gray-400 mb-2">
-          <span>{Math.round(progress * 100)}%</span>
-          <span>{formatTimeString(progress * config.totalDuration)} / {formatTimeString(config.totalDuration)}</span>
+      <div className="mb-6 px-1">
+        <div className="flex items-center justify-between text-sm mb-3">
+          <span 
+            className="font-mono text-xs px-2 py-1 rounded bg-white/5 text-gray-400"
+          >
+            {Math.round(progress * 100)}%
+          </span>
+          <span className="text-gray-500 text-xs">
+            {formatTimeString(progress * config.totalDuration)} / {formatTimeString(config.totalDuration)}
+          </span>
         </div>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.001}
-          value={progress}
-          onChange={(e) => {
-            pause();
-            setProgress(Number(e.target.value));
-            pausedProgressRef.current = Number(e.target.value);
-          }}
-          className="w-full"
-        />
+        <div className="relative">
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.001}
+            value={progress}
+            onChange={(e) => {
+              pause();
+              setProgress(Number(e.target.value));
+              pausedProgressRef.current = Number(e.target.value);
+            }}
+            className="w-full h-2 rounded-full appearance-none cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${progress * 100}%, #1f1f23 ${progress * 100}%, #1f1f23 100%)`,
+            }}
+          />
+        </div>
       </div>
 
       {/* Playback Controls */}
-      <div className="flex items-center justify-center gap-4 mb-6">
+      <div className="flex items-center justify-center gap-3 mb-8">
         <button
           onClick={reset}
-          className="p-3 rounded-xl bg-[#252525] hover:bg-[#2a2a2a] transition-colors"
+          className="p-3.5 rounded-xl transition-all duration-200 group"
+          style={{
+            background: 'linear-gradient(145deg, #1f1f25 0%, #18181c 100%)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
+          }}
           title="重置"
         >
-          <RotateCcw className="w-5 h-5" />
+          <RotateCcw className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
         </button>
         <button
           onClick={isPlaying ? pause : play}
-          className="p-4 rounded-xl bg-indigo-500 hover:bg-indigo-600 transition-colors"
+          className="p-5 rounded-2xl transition-all duration-200 group relative overflow-hidden"
+          style={{
+            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+            boxShadow: '0 4px 20px rgba(99, 102, 241, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+          }}
           title={isPlaying ? '暂停' : '播放'}
         >
+          <div 
+            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{
+              background: 'linear-gradient(135deg, #818cf8 0%, #6366f1 100%)',
+            }}
+          />
           {isPlaying ? (
-            <Pause className="w-6 h-6" />
+            <Pause className="w-6 h-6 relative z-10" />
           ) : (
-            <Play className="w-6 h-6 ml-0.5" />
+            <Play className="w-6 h-6 ml-0.5 relative z-10" />
           )}
         </button>
       </div>
 
       {/* Export Section */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider">导出</h4>
+      <div className="space-y-4">
+        <h4 
+          className="text-xs font-semibold uppercase tracking-widest flex items-center gap-2"
+          style={{ color: '#666' }}
+        >
+          <span className="w-8 h-px bg-gradient-to-r from-transparent to-gray-700" />
+          导出
+          <span className="flex-1 h-px bg-gradient-to-r from-gray-700 to-transparent" />
+        </h4>
         
         {isExporting && (
-          <div className="bg-[#252525] rounded-xl p-4 mb-3">
-            <div className="flex items-center gap-3 mb-2">
-              <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
-              <span className="text-sm">
+          <div 
+            className="rounded-xl p-5 mb-4"
+            style={{
+              background: 'linear-gradient(145deg, #1a1a20 0%, #141418 100%)',
+              border: '1px solid rgba(99, 102, 241, 0.2)',
+            }}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="relative">
+                <Loader2 className="w-5 h-5 animate-spin text-indigo-400" />
+                <div 
+                  className="absolute inset-0 blur-md"
+                  style={{ background: 'radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, transparent 70%)' }}
+                />
+              </div>
+              <span className="text-sm text-gray-300">
                 正在导出 {exportType === 'gif' ? 'GIF 动画' : '视频'}...
               </span>
             </div>
-            <div className="w-full bg-[#1a1a1a] rounded-full h-2">
+            <div 
+              className="w-full rounded-full h-1.5 overflow-hidden"
+              style={{ background: 'rgba(0,0,0,0.3)' }}
+            >
               <div
-                className="bg-indigo-500 h-2 rounded-full transition-all duration-200"
-                style={{ width: `${exportProgress}%` }}
+                className="h-full rounded-full transition-all duration-200"
+                style={{ 
+                  width: `${exportProgress}%`,
+                  background: 'linear-gradient(90deg, #6366f1, #818cf8)',
+                  boxShadow: '0 0 10px rgba(99, 102, 241, 0.5)',
+                }}
               />
             </div>
-            <div className="text-right text-xs text-gray-400 mt-1">
+            <div className="text-right text-xs text-gray-500 mt-2 font-mono">
               {Math.round(exportProgress)}%
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <button
             onClick={exportGIF}
             disabled={isExporting}
-            className="flex flex-col items-center gap-2 p-4 rounded-xl bg-[#252525] hover:bg-[#2a2a2a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="group flex flex-col items-center gap-3 p-5 rounded-xl transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed relative overflow-hidden"
+            style={{
+              background: 'linear-gradient(145deg, #1a1a20 0%, #141418 100%)',
+              border: '1px solid rgba(255,255,255,0.05)',
+            }}
           >
-            <Film className="w-6 h-6 text-indigo-400" />
-            <span className="text-sm font-medium">GIF 动画</span>
-            <span className="text-xs text-gray-500">适合分享预览</span>
+            <div 
+              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{
+                background: 'linear-gradient(145deg, #1f1f28 0%, #18181f 100%)',
+              }}
+            />
+            <div 
+              className="p-3 rounded-xl relative z-10"
+              style={{
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0.05) 100%)',
+              }}
+            >
+              <Film className="w-6 h-6 text-indigo-400" />
+            </div>
+            <div className="relative z-10 text-center">
+              <span className="text-sm font-medium text-gray-200 block">GIF 动画</span>
+              <span className="text-xs text-gray-500 mt-1 block">适合分享预览</span>
+            </div>
           </button>
           
           <button
             onClick={exportVideo}
             disabled={isExporting}
-            className="flex flex-col items-center gap-2 p-4 rounded-xl bg-[#252525] hover:bg-[#2a2a2a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="group flex flex-col items-center gap-3 p-5 rounded-xl transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed relative overflow-hidden"
+            style={{
+              background: 'linear-gradient(145deg, #1a1a20 0%, #141418 100%)',
+              border: '1px solid rgba(255,255,255,0.05)',
+            }}
           >
-            <Video className="w-6 h-6 text-indigo-400" />
-            <span className="text-sm font-medium">视频</span>
-            <span className="text-xs text-gray-500">适合视频编辑</span>
+            <div 
+              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{
+                background: 'linear-gradient(145deg, #1f1f28 0%, #18181f 100%)',
+              }}
+            />
+            <div 
+              className="p-3 rounded-xl relative z-10"
+              style={{
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0.05) 100%)',
+              }}
+            >
+              <Video className="w-6 h-6 text-indigo-400" />
+            </div>
+            <div className="relative z-10 text-center">
+              <span className="text-sm font-medium text-gray-200 block">视频</span>
+              <span className="text-xs text-gray-500 mt-1 block">适合视频编辑</span>
+            </div>
           </button>
         </div>
       </div>
