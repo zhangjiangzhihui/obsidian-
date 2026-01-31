@@ -735,22 +735,28 @@ function renderMascot(ctx: CanvasRenderingContext2D, config: ProgressBarConfig, 
       break;
   }
   
-  // 阴影
+  // 重置所有可能影响渲染的状态
+  ctx.globalAlpha = 1;
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+  
+  // 阴影 - 用偏移和透明度模拟
   ctx.save();
-  ctx.globalAlpha = 0.25;
+  ctx.globalAlpha = 0.3;
   ctx.font = `${mascot.size}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(emoji, progressX + 2, mascotY + 2);
+  ctx.fillText(emoji, progressX + 2, mascotY + 3);
   ctx.restore();
   
-  // 萌宠
-  ctx.save();
+  // 萌宠主体 - 完全不透明
+  ctx.globalAlpha = 1;
   ctx.font = `${mascot.size}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(emoji, progressX, mascotY);
-  ctx.restore();
 }
 
 export default ProgressBarCanvas;
