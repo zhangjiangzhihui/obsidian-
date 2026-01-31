@@ -54,6 +54,12 @@ export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCan
         const mascotSpace = config.mascot.size + 10;
         if (config.mascot.position === 'above-bar' || config.mascot.position === 'below-bar') {
           height += mascotSpace;
+        } else if (config.mascot.position === 'on-bar') {
+          // 当萌宠在进度条上时，如果萌宠比进度条高，需要额外空间
+          const extraSpace = Math.max(0, config.mascot.size - config.height);
+          if (extraSpace > 0) {
+            height += extraSpace + 10; // 上下各留一半空间
+          }
         }
       }
       
@@ -67,8 +73,16 @@ export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCan
         y += 40;
       }
       
-      if (config.mascot.type !== 'none' && config.mascot.position === 'above-bar') {
-        y += config.mascot.size + 10;
+      if (config.mascot.type !== 'none') {
+        if (config.mascot.position === 'above-bar') {
+          y += config.mascot.size + 10;
+        } else if (config.mascot.position === 'on-bar') {
+          // 当萌宠在进度条上时，如果萌宠比进度条高，需要向下偏移
+          const extraSpace = Math.max(0, config.mascot.size - config.height);
+          if (extraSpace > 0) {
+            y += (extraSpace + 10) / 2; // 上方留一半空间
+          }
+        }
       }
       
       return y;

@@ -15,13 +15,19 @@ function calculateCanvasHeight(config: ProgressBarConfig): number {
   let height = config.height;
   
   if (config.showChapterNames && config.chapterNamePosition !== 'inside') {
-    height += 35;
+    height += 40;
   }
   
   if (config.mascot.type !== 'none') {
     const mascotSpace = config.mascot.size + 10;
     if (config.mascot.position === 'above-bar' || config.mascot.position === 'below-bar') {
       height += mascotSpace;
+    } else if (config.mascot.position === 'on-bar') {
+      // 当萌宠在进度条上时，如果萌宠比进度条高，需要额外空间
+      const extraSpace = Math.max(0, config.mascot.size - config.height);
+      if (extraSpace > 0) {
+        height += extraSpace + 10;
+      }
     }
   }
   
