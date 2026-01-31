@@ -449,17 +449,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ config, onChange }) => {
                 onChange={(v) => updateConfig('mascot', { ...config.mascot, size: v })}
               />
 
-              {/* Mascot Effects */}
-              <Toggle
-                label="弹跳效果"
-                checked={config.mascot.bounce}
-                onChange={(v) => updateConfig('mascot', { ...config.mascot, bounce: v })}
-              />
-              <Toggle
-                label="拖尾效果"
-                checked={config.mascot.trail}
-                onChange={(v) => updateConfig('mascot', { ...config.mascot, trail: v })}
-              />
             </>
           )}
         </div>

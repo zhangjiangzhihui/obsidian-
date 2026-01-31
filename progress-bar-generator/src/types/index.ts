@@ -14,8 +14,6 @@ export interface MascotConfig {
   customEmoji: string;
   size: number;
   position: 'on-bar' | 'above-bar' | 'below-bar';
-  bounce: boolean;
-  trail: boolean;
 }
 
 export interface ProgressBarConfig {
@@ -88,8 +86,6 @@ export const DEFAULT_MASCOT: MascotConfig = {
   customEmoji: '😀',
   size: 32,
   position: 'on-bar',
-  bounce: true,
-  trail: false,
 };
 
 export const DEFAULT_CONFIG: ProgressBarConfig = {

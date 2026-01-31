@@ -127,7 +127,7 @@ export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCan
       
       // Render mascot
       if (config.mascot.type !== 'none') {
-        renderMascot(ctx, config, easedProgress, barY, currentProgress);
+        renderMascot(ctx, config, easedProgress, barY);
       }
       
       // Render chapter names LAST (on top of everything)
@@ -711,8 +711,7 @@ function renderMascot(
   ctx: CanvasRenderingContext2D,
   config: ProgressBarConfig,
   progress: number,
-  barY: number,
-  rawProgress: number
+  barY: number
 ) {
   const { width, height, mascot } = config;
   
@@ -738,34 +737,8 @@ function renderMascot(
       break;
     case 'on-bar':
     default:
-      // Always center on the bar
       mascotY = barY + height / 2;
       break;
-  }
-  
-  // Bounce effect
-  let bounceOffset = 0;
-  if (mascot.bounce) {
-    bounceOffset = Math.sin(rawProgress * Math.PI * 20) * 5;
-  }
-  
-  // Draw trail
-  if (mascot.trail && progress > 0.05) {
-    const trailCount = 5;
-    for (let i = trailCount; i > 0; i--) {
-      const trailProgress = Math.max(0, progress - i * 0.02);
-      const trailX = trailProgress * width;
-      const trailAlpha = (1 - i / trailCount) * 0.3;
-      const trailSize = mascot.size * (1 - i / trailCount * 0.3);
-      
-      ctx.save();
-      ctx.globalAlpha = trailAlpha;
-      ctx.font = `${trailSize}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(emoji, trailX, mascotY);
-      ctx.restore();
-    }
   }
   
   // Draw mascot shadow
@@ -774,7 +747,7 @@ function renderMascot(
   ctx.font = `${mascot.size}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(emoji, progressX + 2, mascotY + bounceOffset + 2);
+  ctx.fillText(emoji, progressX + 2, mascotY + 2);
   ctx.restore();
   
   // Draw mascot
@@ -782,7 +755,7 @@ function renderMascot(
   ctx.font = `${mascot.size}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(emoji, progressX, mascotY + bounceOffset);
+  ctx.fillText(emoji, progressX, mascotY);
   ctx.restore();
 }
 
