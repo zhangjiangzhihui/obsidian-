@@ -138,12 +138,13 @@ export const ProgressBarCanvas = forwardRef<ProgressBarCanvasRef, ProgressBarCan
           break;
       }
       
-      if (config.mascot.type !== 'none') {
-        renderMascot(ctx, config, easedProgress, actualBarY, actualBarHeight);
-      }
-      
       if (config.showChapterNames) {
         renderChapterNames(ctx, config, easedProgress, actualBarY, actualBarHeight);
+      }
+      
+      // 萌宠最后渲染，确保显示在最上层
+      if (config.mascot.type !== 'none') {
+        renderMascot(ctx, config, easedProgress, actualBarY, actualBarHeight);
       }
     };
 
